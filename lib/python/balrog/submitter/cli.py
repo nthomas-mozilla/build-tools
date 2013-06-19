@@ -79,8 +79,9 @@ class NightlyRunner(object):
         copyTo = [get_nightly_blob_name(
             self.appName, self.branch, self.build_type, 'latest', self.dummy)]
         copyTo = json.dumps(copyTo)
+        alias = json.dumps(self.alias)
         api.update_build(name=self.name, product=self.appName,
                          build_target=self.build_target,
                          version=self.appVersion, locale=self.locale,
                          hashFunction=self.hashFunction,
-                         buildData=data, copyTo=copyTo, alias=self.alias)
+                         buildData=data, copyTo=copyTo, alias=alias)
