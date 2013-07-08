@@ -15,6 +15,7 @@ site.addsitedir(path.join(path.dirname(__file__), "../../lib/python"))
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python/vendor"))
 
 import requests
+from util.archives import bzip2, unpackmar
 #from release.updates.snippets import createSnippet, getSnippetPaths
 
 MAR_URL = "http://stage.mozilla.org/pub/mozilla.org/firefox/nightly/%(dir)s/firefox-%(version)s.%(locale)s.%(platform)s.complete.mar"
@@ -42,19 +43,12 @@ def setup_newfiles(channel, mac=False):
     makedirs(WORKDIR_NEW_FILES)
     log.info('Creating defaults/pref/channel-prefs.js')
     makedirs(path.join(WORKDIR_NEW_FILES, 'defaults', 'pref'))
-    f = open(path.join(WORKDIR_NEW_FILES, 'defaults', 'pref', 'channel-prefs.js'), 'w')
+    file = path.join(WORKDIR_NEW_FILES, 'defaults', 'pref', 'channel-prefs.js')
+    f = open(file, 'w')
     f.write('pref("app.update.channel", "%s");\n' % channel)
     f.close()
-    log.info('Creating update-settings.ini')
-    f = open(path.join(WORKDIR_NEW_FILES, 'update-settings.ini'), 'w')
-    f.write(
-"""; If you modify this file updates may fail.
-; Do not modify this file.
-
-[Settings]
-ACCEPTED_MAR_CHANNEL_IDS=%s
-""" % CHANNEL_INFO[channel]['channel_id'])
-    f.close()
+    bzip2(file)
+    # complete mar files already contain update-settings.ini
 
     if mac:
         log.info('Duplicating for silly old mac')
@@ -66,9 +60,6 @@ ACCEPTED_MAR_CHANNEL_IDS=%s
             new_files.append( path.join(root, f)[len(WORKDIR_NEW_FILES)+1:])
 
     return sorted(new_files, reverse=True)
-
-def bzipFile(file):
-    return file
 
 def getVersion(channel):
     log.debug('Getting version for channel %s' % channel)
@@ -101,16 +92,6 @@ def download_file(url, dest=WORKDIR):
     urllib.urlretrieve(url, dest)
     return dest
 
-def unpack_mar(file):
-    # files are still bzip compressed
-    log.info('Unpacking %s' % file)
-    file = path.abspath(file)
-    cwd = getcwd()
-    chdir(WORKDIR_UNPACK)
-    p = subprocess.check_output(['mar', '-x', file], stderr=subprocess.STDOUT)
-    chdir(cwd)
-    return
-
 def modify_manifest(new_files):
     # one, or both of these ?
     log.info('Parsing %s' % 'uhhhhhh')
@@ -137,7 +118,7 @@ def repack_mar(locale, platform, new_files):
     if path.exists(WORKDIR_UNPACK):
         rmtree(WORKDIR_UNPACK)
     copytree(WORKDIR_NEW_FILES, WORKDIR_UNPACK)
-    unpack_mar(mar_file)
+    unpackmar(mar_file, WORKDIR_UNPACK)
     return
     #file_list = modify_manifest(new_files)
     #new_mar_file = os.path.join(UPLOAD_DIR, os.path.basename(mar_url))
