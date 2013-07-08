@@ -10,6 +10,7 @@ import site
 import subprocess
 import sys
 import urllib
+import bz2
 
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python"))
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python/vendor"))
@@ -92,14 +93,28 @@ def download_file(url, dest=WORKDIR):
     urllib.urlretrieve(url, dest)
     return dest
 
-def modify_manifest(new_files):
-    # one, or both of these ?
-    log.info('Parsing %s' % 'uhhhhhh')
-    log.info('Adding new files')
-    return ['baz', 'boop']
+def modify_manifests(new_files):
+    for manifest_file in ('update.manifest', 'updatev2.manifest'):
+        log.debug('Modifying %s' % manifest_file)
+        manifest_file = path.join(WORKDIR_UNPACK, manifest_file)
+        fd = bz2.BZ2File(manifest_file, 'r')
+        manifest = fd.readlines()
+        fd.close()
 
-def getFileList():
-    pass
+        files = []
+        for line in manifest:
+            if line.startswith('add'):
+                files.append(line.split()[1].replace('"', ''))
+
+        for f in new_files:
+            manifest.append('add-if "%s" "%s"\n' % (f, f))
+            files.append(f)
+
+        fd = bz2.BZ2File(manifest_file, 'w')
+        fd.writelines(manifest)
+        fd.close()
+
+    return files
 
 def create_mar(mar_file, files):
     log.info('Creating %s' % mar_file)
@@ -119,8 +134,8 @@ def repack_mar(locale, platform, new_files):
         rmtree(WORKDIR_UNPACK)
     copytree(WORKDIR_NEW_FILES, WORKDIR_UNPACK)
     unpackmar(mar_file, WORKDIR_UNPACK)
+    file_list = modify_manifests(new_files)
     return
-    #file_list = modify_manifest(new_files)
     #new_mar_file = os.path.join(UPLOAD_DIR, os.path.basename(mar_url))
     #create_mar(new_mar_file, file_list)
     #create_snippet(new_mar_file)
@@ -164,8 +179,8 @@ if __name__ == '__main__':
     if path.exists(WORKDIR):
         log.debug('Removing workdir %s' % path.abspath(WORKDIR))
         rmtree(WORKDIR)
-    #makedirs(WORKDIR_SNIPPETS)
-    #makedirs(WORKDIR_MAR)
+    makedirs(WORKDIR_MAR)
+    makedirs(WORKDIR_SNIPPETS)
 
     args.from_version  = getVersion(args.from_channel)
     args.to_version = getVersion(args.to_channel)
