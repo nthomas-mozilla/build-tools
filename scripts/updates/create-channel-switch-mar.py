@@ -36,13 +36,14 @@ CHANNEL_INFO = {
 }
 WORKDIR = 'working'
 WORKDIR_NEW_FILES = path.join(WORKDIR, 'new_files')
+WORKDIR_OLD_MAR = path.join(WORKDIR, 'old-mar')
 WORKDIR_UNPACK = path.join(WORKDIR, 'unpacked')
-WORKDIR_MAR = path.join(WORKDIR, 'ftp')
+WORKDIR_NEW_MAR = path.join(WORKDIR, 'new-mar')
 WORKDIR_SNIPPETS = path.join(WORKDIR, 'snippets')
 
 def setup_newfiles(channel, mac=False):
     makedirs(WORKDIR_NEW_FILES)
-    log.info('Creating defaults/pref/channel-prefs.js')
+    log.debug('Creating defaults/pref/channel-prefs.js')
     makedirs(path.join(WORKDIR_NEW_FILES, 'defaults', 'pref'))
     file = path.join(WORKDIR_NEW_FILES, 'defaults', 'pref', 'channel-prefs.js')
     f = open(file, 'w')
@@ -52,7 +53,7 @@ def setup_newfiles(channel, mac=False):
     # complete mar files already contain update-settings.ini
 
     if mac:
-        log.info('Duplicating for silly old mac')
+        log.debug('Duplicating for silly old mac')
         copytree(WORKDIR_NEW_FILES, path.join(WORKDIR_NEW_FILES, 'Contents', 'MacOS'))
 
     new_files = []
@@ -63,7 +64,7 @@ def setup_newfiles(channel, mac=False):
     return sorted(new_files, reverse=True)
 
 def getVersion(channel):
-    log.debug('Getting version for channel %s' % channel)
+    log.info('Getting version for channel %s' % channel)
     try:
         url = CHANNEL_INFO[channel]['version_url']
         r = requests.get(url)
@@ -116,25 +117,19 @@ def modify_manifests(new_files):
 
     return files
 
-def create_mar(mar_file, files):
-    log.info('Creating %s' % mar_file)
-    # call out to mar
-    if args.sign:
-        log.info('Signing new mar')
-
 def create_snippet(mar_file):
     log.info('Creating snippet for %s' % mar_file)
     # call snippet func we already have
 
 def repack_mar(locale, platform, new_files):
     mar_url = constructUrl(args.to_channel, locale, platform, args.to_version)
-    mar_file = download_file(mar_url, dest=path.join(WORKDIR, 'download', path.basename(mar_url)))
+    mar_file = download_file(mar_url, dest=path.join(WORKDIR_OLD_MAR, path.basename(mar_url)))
     if path.exists(WORKDIR_UNPACK):
         rmtree(WORKDIR_UNPACK)
     copytree(WORKDIR_NEW_FILES, WORKDIR_UNPACK)
     unpackmar(mar_file, WORKDIR_UNPACK)
     file_list = modify_manifests(new_files)
-    new_mar_file = mar_file.replace(WORKDIR_UNPACK, WORKDIR_MAR)
+    new_mar_file = mar_file.replace(WORKDIR_OLD_MAR, WORKDIR_NEW_MAR)
     packmar(new_mar_file, WORKDIR_UNPACK, CHANNEL_INFO[args.from_channel]['channel_id'], args.from_version)
     return
     #sign mar
@@ -166,7 +161,7 @@ if __name__ == '__main__':
     log_level = logging.INFO
     if args.verbose:
         log_level = logging.DEBUG
-    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(name)s.%(funcName)s#%(lineno)s: %(message)s")
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s: %(message)s")
     log = logging.getLogger()
 
     if args.sign:
@@ -177,7 +172,7 @@ if __name__ == '__main__':
     if path.exists(WORKDIR):
         log.debug('Removing workdir %s' % path.abspath(WORKDIR))
         rmtree(WORKDIR)
-    makedirs(WORKDIR_MAR)
+    makedirs(WORKDIR_NEW_MAR)
     makedirs(WORKDIR_SNIPPETS)
 
     args.from_version  = getVersion(args.from_channel)
