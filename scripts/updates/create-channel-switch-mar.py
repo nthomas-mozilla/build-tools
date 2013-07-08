@@ -16,7 +16,7 @@ site.addsitedir(path.join(path.dirname(__file__), "../../lib/python"))
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python/vendor"))
 
 import requests
-from util.archives import bzip2, unpackmar
+from util.archives import bzip2, unpackmar, packmar
 #from release.updates.snippets import createSnippet, getSnippetPaths
 
 MAR_URL = "http://stage.mozilla.org/pub/mozilla.org/firefox/nightly/%(dir)s/firefox-%(version)s.%(locale)s.%(platform)s.complete.mar"
@@ -37,8 +37,8 @@ CHANNEL_INFO = {
 WORKDIR = 'working'
 WORKDIR_NEW_FILES = path.join(WORKDIR, 'new_files')
 WORKDIR_UNPACK = path.join(WORKDIR, 'unpacked')
-WORKDIR_MAR = path.join(WORKDIR, 'upload', 'ftp')
-WORKDIR_SNIPPETS = path.join(WORKDIR, 'upload', 'snippets')
+WORKDIR_MAR = path.join(WORKDIR, 'ftp')
+WORKDIR_SNIPPETS = path.join(WORKDIR, 'snippets')
 
 def setup_newfiles(channel, mac=False):
     makedirs(WORKDIR_NEW_FILES)
@@ -127,7 +127,6 @@ def create_snippet(mar_file):
     # call snippet func we already have
 
 def repack_mar(locale, platform, new_files):
-    # create tmp dir
     mar_url = constructUrl(args.to_channel, locale, platform, args.to_version)
     mar_file = download_file(mar_url, dest=path.join(WORKDIR, 'download', path.basename(mar_url)))
     if path.exists(WORKDIR_UNPACK):
@@ -135,9 +134,10 @@ def repack_mar(locale, platform, new_files):
     copytree(WORKDIR_NEW_FILES, WORKDIR_UNPACK)
     unpackmar(mar_file, WORKDIR_UNPACK)
     file_list = modify_manifests(new_files)
+    new_mar_file = mar_file.replace(WORKDIR_UNPACK, WORKDIR_MAR)
+    packmar(new_mar_file, WORKDIR_UNPACK, CHANNEL_INFO[args.from_channel]['channel_id'], args.from_version)
     return
-    #new_mar_file = os.path.join(UPLOAD_DIR, os.path.basename(mar_url))
-    #create_mar(new_mar_file, file_list)
+    #sign mar
     #create_snippet(new_mar_file)
     
 if __name__ == '__main__':
@@ -158,8 +158,6 @@ if __name__ == '__main__':
     parser.add_argument("-b", "--base-url",
                         default="http://ftp.mozilla.org/pub/mozilla.org/firefox/nightly/channel-switch/",
                         help="base url to host the mar files at")
-#    parser.add_argument("-V", "--version", default="100.0",
-#                        help="Version to sign file with")
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="verbose messages")
 

@@ -134,18 +134,21 @@ def unpackmar(marfile, destdir):
     nullfd.close()
 
 
-def packmar(marfile, srcdir):
+def packmar(marfile, srcdir, channelID=None, version=None):
     """Create marfile from the contents of srcdir"""
-    nullfd = open(os.devnull, "w")
     files = [f[len(srcdir) + 1:] for f in findfiles(srcdir)]
     marfile = cygpath(os.path.abspath(marfile))
+    cmd = [MAR]
+    if channelID:
+        cmd.extend(['-H', channelID])
+    if version:
+        cmd.extend(['-V', version])
+    cmd.extend(['-c', marfile] + files)
     try:
-        check_call(
-            [MAR, '-c', marfile] + files, cwd=srcdir, preexec_fn=_noumask)
+        check_call(cmd, cwd=srcdir, preexec_fn=_noumask)
     except:
         log.exception("Error packing mar file %s from %s", marfile, srcdir)
         raise
-    nullfd.close()
 
 
 def unpacktar(tarfile, destdir):
