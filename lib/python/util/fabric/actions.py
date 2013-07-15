@@ -2,10 +2,13 @@ from fabric.api import run
 from fabric.context_managers import cd, hide, show
 from fabric.operations import put
 from fabric.colors import green, red
+import paramiko
 import re
 import os
 import sys
 import inspect
+import subprocess
+import time
 
 OK = green('[OK]')
 FAIL = red('[FAIL]')
@@ -209,3 +212,82 @@ def action_update_queue(host):
         with cd(tools_dir):
             run('hg pull -u')
     print OK, "updated queue in %s" % host
+
+
+@per_host
+def action_retry_dead_queue(host):
+    for q in 'commands', 'pulse':
+        cmd = "find /dev/shm/queue/%s/dead -type f" % q
+        for f in run(cmd).split("\n"):
+            f = f.strip()
+            if not f:
+                continue
+            with show('running'):
+                run("mv %s /dev/shm/queue/%s/new" % (f, q))
+
+
+class IgnoreMissingHostKey(paramiko.MissingHostKeyPolicy):
+    def missing_host_key(self, *args, **kwargs):
+        return
+
+
+def action_unstick_slaves(master):
+    # Use the manhole to unstick slaves
+    # Log with regular ssh to set up forwarding
+    print "Starting ssh tunnel to", master['hostname']
+    ssh_tunnel = subprocess.Popen(
+        ["ssh", "-l", "cltbld",
+         '-o', 'StrictHostKeyChecking=no',
+         '-L%s:localhost:%s' % (master['ssh_port'], master['ssh_port']),
+         master['hostname'], 'sleep 60'])
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(IgnoreMissingHostKey())
+    print "Connecting to manhole via tunnel"
+
+    for _ in range(10):
+        try:
+            assert ssh_tunnel.poll() is None
+            client.connect(hostname='localhost', port=master['ssh_port'], username='cltbld', password='password')
+            break
+        except Exception:
+            time.sleep(0.5)
+    else:
+        raise IOError("couldn't connect")
+
+    magic = """\
+for s in master.botmaster.slaves.values():
+    if s.slave and s.slave_status.getGraceful():
+        if len([sb for sb in s.slavebuilders.values() if sb.isBusy()]) == 0:
+            print "stopping", s.slavename
+            s.slave.callRemote("shutdown")
+
+# SENTINAL
+"""
+    transport = client.get_transport()
+    session = transport.open_session()
+    session.set_combine_stderr(True)
+    session.get_pty(term='screen')
+    session.invoke_shell()
+
+    session.sendall("\n")
+    f = session.makefile()
+    print "Sending magic"
+    session.sendall(magic + "\n\n")
+    session.close()
+
+    stopped_slaves = []
+    while True:
+        line = f.readline()
+        if line:
+            m = re.match("stopping (\S+)", line)
+            if m:
+                stopped_slaves.append(m.group(1))
+        if "# SENTINAL" in line:
+            break
+        time.sleep(0.1)
+
+    for s in sorted(stopped_slaves):
+        print "stopped", s
+    ssh_tunnel.kill()
+    ssh_tunnel.wait()
