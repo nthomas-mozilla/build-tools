@@ -223,8 +223,60 @@ def action_retry_dead_queue(host):
             if not f:
                 continue
             with show('running'):
-                run("mv %s /dev/shm/queue/%s/new" % (f, q))
+                if f.endswith(".log"):
+                    run("rm %s" % f)
+                else:
+                    run("mv %s /dev/shm/queue/%s/new" % (f, q))
 
+
+def manhole_action(master, commands):
+    print "Starting ssh tunnel to", master['hostname']
+    ssh_tunnel = subprocess.Popen(
+        ["ssh", "-l", "cltbld",
+         '-o', 'StrictHostKeyChecking=no',
+         '-L%s:localhost:%s' % (master['ssh_port'], master['ssh_port']),
+         master['hostname'], 'sleep 60'])
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(IgnoreMissingHostKey())
+    print "Connecting to manhole via tunnel"
+
+    for _ in range(10):
+        try:
+            assert ssh_tunnel.poll() is None
+            client.connect(hostname='localhost', port=master['ssh_port'], username='cltbld', password='password')
+            break
+        except Exception:
+            time.sleep(0.5)
+    else:
+        raise IOError("couldn't connect")
+
+    transport = client.get_transport()
+    session = transport.open_session()
+    session.set_combine_stderr(True)
+    session.get_pty(term='screen')
+    session.invoke_shell()
+
+    session.sendall("\n")
+    f = session.makefile()
+    print "Sending magic"
+    session.sendall(commands + "\n\n# SENTINAL\n")
+    session.close()
+
+    lines = []
+    while True:
+        line = f.readline()
+        if line:
+            lines.append(line)
+        if "# SENTINAL" in line:
+            break
+        time.sleep(0.1)
+
+    ssh_tunnel.kill()
+    ssh_tunnel.wait()
+    time.sleep(0.5)
+
+    return lines
 
 class IgnoreMissingHostKey(paramiko.MissingHostKeyPolicy):
     def missing_host_key(self, *args, **kwargs):
@@ -253,6 +305,7 @@ def action_unstick_slaves(master):
         except Exception:
             time.sleep(0.5)
     else:
+        ssh_tunnel.kill()
         raise IOError("couldn't connect")
 
     magic = """\
@@ -291,3 +344,17 @@ for s in master.botmaster.slaves.values():
         print "stopped", s
     ssh_tunnel.kill()
     ssh_tunnel.wait()
+
+
+def action_set_logging(master):
+    manhole_action(master, """\
+master.log_rotation.maxRotatedFiles = 200
+master.log_rotation.rotateLength = 50000000
+import gc
+for x in gc.get_referrers(master.parent):
+    if isinstance(x, dict) and 'twisted.python.log.ILogObserver' in x:
+        log = x['twisted.python.log.ILogObserver']
+        log.im_self.write.im_self.maxRotatedFiles = 200
+        log.im_self.write.im_self.rotateLength = 50000000
+        break
+""")
