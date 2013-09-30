@@ -14,7 +14,7 @@ site.addsitedir(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../li
 from sut_lib import connect, log
 
 # Constants
-target_version = "1.17"
+target_version = "1.19"
 apkfilename = "sutAgentAndroid.apk"
 device_name = os.getenv('SUT_NAME')
 apkFoopyDirPattern = "/builds/%(device_name)s"
@@ -103,7 +103,7 @@ def version(dm):
 
 
 def download_apk():
-    url = 'http://build.mozilla.org/talos/mobile/sutAgentAndroid.%s.apk' % target_version
+    url = 'http://talos-bundles.pvt.build.mozilla.org/mobile/sutAgentAndroid.%s.apk' % target_version
     log.info("INFO: updateSUT.py: We're downloading the apk: %s" % url)
     req = urllib2.Request(url)
     try:

@@ -305,15 +305,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -345,15 +347,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -385,15 +389,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -425,15 +431,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -517,9 +525,9 @@
     "name": "bm57-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -545,9 +553,9 @@
     "name": "bm58-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -623,9 +631,9 @@
     "name": "bm61-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -651,9 +659,9 @@
     "name": "bm62-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -679,9 +687,9 @@
     "name": "bm63-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -707,9 +715,9 @@
     "name": "bm64-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -735,9 +743,9 @@
     "name": "bm65-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -763,9 +771,9 @@
     "name": "bm66-build1",
     "pb_port": 9001,
     "role": "build",
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "ssh_port": 7001,
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build1/tools"
@@ -789,15 +797,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -829,15 +839,17 @@
     "http_port": 8201,
     "limit_fx_platforms": [
       "linux",
-      "linux64"
+      "linux64",
+      "linux64-asan"
     ],
-    "limit_mobile_platforms": [],
+    "limit_mobile_platforms": [
+      "android-x86"
+    ],
     "limit_tb_platforms": [
       "linux",
       "linux64"
     ],
     "limit_b2g_platforms": [
-      "ics_armv7a_gecko",
       "linux32_gecko",
       "linux64_gecko",
       "emulator"
@@ -1078,7 +1090,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm75-tests1-macosx",
     "pb_port": 9201,
@@ -1111,7 +1125,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm76-tests1-macosx",
     "pb_port": 9201,
@@ -1144,7 +1160,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm77-tests1-macosx",
     "pb_port": 9201,
@@ -1177,7 +1195,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm78-tests1-macosx",
     "pb_port": 9201,
@@ -1210,7 +1230,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm79-tests1-macosx",
     "pb_port": 9201,
@@ -1243,7 +1265,9 @@
     "limit_tb_platforms": [
         "macosx64"
     ],
-    "limit_b2g_platforms": [],
+    "limit_b2g_platforms": [
+        "macosx64_gecko"
+    ],
     "master_dir": "/builds/buildbot/tests1-macosx/master",
     "name": "bm80-tests1-macosx",
     "pb_port": 9201,
@@ -1273,9 +1297,9 @@
     "pb_port": 9301,
     "role": "scheduler",
     "ssh_port": 7301,
-    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17"],
+    "release_branches": ["mozilla-release", "mozilla-beta", "mozilla-esr17", "mozilla-esr24"],
     "mobile_release_branches": ["mozilla-release", "mozilla-beta"],
-    "thunderbird_release_branches": ["comm-beta", "comm-release", "comm-esr17"],
+    "thunderbird_release_branches": ["comm-beta", "comm-esr24", "comm-esr17"],
     "tools_branch": "default",
     "tools_dir": "/builds/buildbot/build_scheduler/tools"
   },

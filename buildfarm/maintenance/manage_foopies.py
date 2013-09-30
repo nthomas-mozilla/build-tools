@@ -43,6 +43,7 @@ def _calc_selected(hosts, devices):
             selected[f] = deepcopy(_foopy_map[f])
     for d in devices:
         if d not in _devices_map:
+            sys.stderr.write("Warning: device '%s' not found in device map\n" % d)
             continue
         if 'foopy' not in _devices_map[d]:
             continue
@@ -79,7 +80,10 @@ def run_action_on_devices(action, foopy_dict):
     try:
         with settings(host_string="%s.build.mozilla.org" % foopy_dict['host']):
             for device in foopy_dict['devices']:
-                action_func(device)
+                if hasattr(action_func, "needs_device_dict"):
+                    action_func(device, _devices_map[device])
+                else:
+                    action_func(device)
             return True
         return False
     except AttributeError:

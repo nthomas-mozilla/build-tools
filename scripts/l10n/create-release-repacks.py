@@ -12,7 +12,7 @@ from build.l10n import repackLocale, l10nRepackPrep
 import build.misc
 from build.upload import postUploadCmdPrefix
 from release.download import downloadReleaseBuilds, downloadUpdateIgnore404
-from release.info import readReleaseConfig, readBranchConfig
+from release.info import readReleaseConfig
 from release.l10n import getReleaseLocalesForChunk
 from util.hg import mercurial, update, make_hg_url
 from util.retry import retry
@@ -35,7 +35,8 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
                   stageServer, stageUsername, stageSshKey,
                   compareLocalesRepo, merge, platform, brand,
                   generatePartials=False, partialUpdates=None,
-                  appVersion=None):
+                  appVersion=None, usePymake=False, tooltoolManifest=None,
+                  tooltool_script=None, tooltool_urls=None):
     sourceRepoName = path.split(sourceRepo)[-1]
     localeSrcDir = path.join(sourceRepoName, objdir, appName, "locales")
     # Even on Windows we need to use "/" as a separator for this because
@@ -67,16 +68,32 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
         buildNumber=buildNumber,
         signed=signed,
     )
+    if usePymake:
+        env['USE_PYMAKE'] = "1"
+        env['MOZILLA_OFFICIAL'] = "1"
+        env["MOZ_SIGN_CMD"] = "python " + \
+            path.join(os.getcwd(), "scripts", "release", "signing", "signtool.py").replace('\\', '\\\\\\\\') + \
+            " --cachedir " + \
+            path.join(os.getcwd(), "signing_cache").replace('\\', '\\\\\\\\') + \
+            " -t " + \
+            path.join(os.getcwd(), "token").replace('\\', '\\\\\\\\') + \
+            " -n " + \
+            path.join(os.getcwd(), "nonce").replace('\\', '\\\\\\\\') + \
+            " -c " + \
+            path.join(os.getcwd(), "scripts", "release", "signing", "host.cert").replace('\\', '\\\\\\\\') + \
+            " -H " + \
+            os.environ['MOZ_SIGN_CMD'].split(' ')[-1]
     build.misc.cleanupObjdir(sourceRepoName, objdir, appName)
     retry(mercurial, args=(sourceRepo, sourceRepoName))
     update(sourceRepoName, revision=revision)
     l10nRepackPrep(
         sourceRepoName, objdir, mozconfigPath, srcMozconfigPath, l10nRepoDir,
-        makeDirs, localeSrcDir, env)
+        makeDirs, localeSrcDir, env, tooltoolManifest, tooltool_script, tooltool_urls)
     input_env = retry(downloadReleaseBuilds,
                       args=(stageServer, product, brand, version, buildNumber,
                             platform),
-                      kwargs={'signed': signed})
+                      kwargs={'signed': signed,
+                              'usePymake': usePymake})
     env.update(input_env)
 
     failed = []
@@ -96,7 +113,8 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
                          compareLocalesRepo=compareLocalesRepo, env=env,
                          merge=merge,
                          productName=product, platform=platform,
-                         version=version, partialUpdates=partialUpdates)
+                         version=version, partialUpdates=partialUpdates,
+                         buildNumber=buildNumber, stageServer=stageServer)
         except Exception, e:
             failed.append((l, format_exc()))
 
@@ -118,7 +136,7 @@ def validate(options, args):
     if not options.configfile:
         log.info("Must pass --configfile")
         sys.exit(1)
-    releaseConfigFile = path.join("buildbot-configs", options.releaseConfig)
+    releaseConfigFile = "/".join(["buildbot-configs", options.releaseConfig])
 
     if options.chunks or options.thisChunk:
         assert options.chunks and options.thisChunk, \
@@ -131,8 +149,6 @@ def validate(options, args):
 
     releaseConfig = readReleaseConfig(releaseConfigFile,
                                       required=REQUIRED_RELEASE_CONFIG)
-    sourceRepoName = releaseConfig['sourceRepositories'][
-        options.source_repo_key]['name']
     branchConfig = {
         'stage_ssh_key': options.stage_ssh_key,
         'hghost': options.hghost,
@@ -146,8 +162,7 @@ if __name__ == "__main__":
     from optparse import OptionParser
     parser = OptionParser("")
 
-    makeDirs = ["config", "tier_base", "tier_nspr", path.join(
-        "modules", "libmar")]
+    makeDirs = ["config"]
 
     parser.set_defaults(
         buildbotConfigs=os.environ.get("BUILDBOT_CONFIGS",
@@ -177,13 +192,14 @@ if __name__ == "__main__":
     parser.add_option(
         "--compare-locales-repo-path", dest="compare_locales_repo_path")
     parser.add_option("--properties-dir", dest="properties_dir")
+    parser.add_option("--tooltool-manifest", dest="tooltool_manifest")
+    parser.add_option("--tooltool-script", dest="tooltool_script",
+                      default="/tools/tooltool.py")
+    parser.add_option("--tooltool-url", dest="tooltool_urls", action="append")
+    parser.add_option("--use-pymake", dest="use_pymake",
+                      action="store_true", default=False)
 
     options, args = parser.parse_args()
-    if options.generatePartials:
-        makeDirs.extend([
-            path.join("modules", "libbz2"),
-            path.join("other-licenses", "bsdiff")
-        ])
     retry(mercurial, args=(options.buildbotConfigs, "buildbot-configs"))
     update("buildbot-configs", revision=options.releaseTag)
     sys.path.append(os.getcwd())
@@ -195,8 +211,25 @@ if __name__ == "__main__":
         brandName = releaseConfig["brandName"]
     except KeyError:
         brandName = releaseConfig["productName"].title()
-    mozconfig = path.join("buildbot-configs", "mozilla2", options.platform,
-                          sourceRepoInfo['name'], "release", "l10n-mozconfig")
+
+    platform = options.platform
+    if platform == "linux":
+        platform = "linux32"
+    mozconfig = path.join(sourceRepoInfo['name'], releaseConfig["appName"],
+                          "config", "mozconfigs", platform,
+                          "l10n-mozconfig")
+    # FIXME: please kill the following block when ESR17 is dead
+    if releaseConfig["appVersion"].startswith("17.0"):
+        mozconfig = path.join("buildbot-configs", "mozilla2", options.platform,
+                              sourceRepoInfo['name'], "release",
+                              "l10n-mozconfig")
+        makeDirs.extend(["tier_base", "tier_nspr", path.join("modules", "libmar")])
+        if options.generatePartials:
+            makeDirs.extend([
+                path.join("modules", "libbz2"),
+                path.join("other-licenses", "bsdiff")
+            ])
+
     if options.chunks:
         locales = retry(getReleaseLocalesForChunk,
                         args=(
@@ -219,10 +252,13 @@ if __name__ == "__main__":
         f.write('locales:%s' % ','.join(locales))
         f.close()
 
-    try:
-        l10nRepoDir = path.split(releaseConfig["l10nRepoClonePath"])[-1]
-    except KeyError:
-        l10nRepoDir = path.split(releaseConfig["l10nRepoPath"])[-1]
+    l10nRepoDir = 'l10n'
+    # FIXME: please kill the following block when ESR17 is dead
+    if releaseConfig["appVersion"].startswith("17.0"):
+        try:
+            l10nRepoDir = path.split(releaseConfig["l10nRepoClonePath"])[-1]
+        except KeyError:
+            l10nRepoDir = path.split(releaseConfig["l10nRepoPath"])[-1]
 
     stageSshKey = path.join("~", ".ssh", branchConfig["stage_ssh_key"])
 
@@ -259,4 +295,8 @@ if __name__ == "__main__":
         brand=brandName,
         generatePartials=options.generatePartials,
         partialUpdates=releaseConfig["partialUpdates"],
+        usePymake=options.use_pymake,
+        tooltoolManifest=options.tooltool_manifest,
+        tooltool_script=options.tooltool_script,
+        tooltool_urls=options.tooltool_urls,
     )

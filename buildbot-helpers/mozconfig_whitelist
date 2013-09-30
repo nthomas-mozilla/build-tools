@@ -3,10 +3,11 @@
 whitelist = {
     'mozilla-release': {},
     'mozilla-esr17': {},
+    'mozilla-esr24': {},
     'mozilla-beta': {},
-    'comm-release': {},
     'comm-esr17': {},
     'comm-beta': {},
+    'comm-esr24': {},
     'nightly': {},
     }
 
@@ -16,6 +17,11 @@ for platform in all_platforms:
     whitelist['nightly'][platform] = [
         'ac_add_options --enable-update-channel=nightly',
         'mk_add_options CLIENT_PY_ARGS="--hg-options=\'--verbose --time\' --hgtool=../tools/buildfarm/utils/hgtool.py --skip-chatzilla --skip-comm --skip-inspector --skip-venkman --tinderbox-print"'
+    ]
+
+for platform in ['linux', 'linux64']:
+    whitelist['nightly'][platform] += [
+        'ac_add_options --disable-elf-hack # --enable-elf-hack conflicts with --enable-profiling',
     ]
 
 for platform in ['linux', 'linux64', 'macosx64']:
@@ -68,6 +74,7 @@ whitelist['nightly']['android'] += [
     'ac_add_options --enable-warnings-as-errors',
     'ac_add_options --with-ccache=/usr/bin/ccache',
     'ac_add_options --enable-profiling',
+    'ac_add_options --disable-elf-hack # --enable-elf-hack conflicts with --enable-profiling',
     'STRIP_FLAGS="--strip-debug"',
 ]
 
@@ -81,6 +88,9 @@ whitelist['nightly']['android-x86'] += [
     'ac_add_options --enable-update-channel=${MOZ_UPDATE_CHANNEL}',
     'ac_add_options --enable-warnings-as-errors',
     'ac_add_options --with-ccache=/usr/bin/ccache',
+    'ac_add_options --enable-profiling',
+    'ac_add_options --disable-elf-hack # --enable-elf-hack conflicts with --enable-profiling',
+    'STRIP_FLAGS="--strip-debug"',
 ]
 
 for branch in ('mozilla-beta', 'comm-beta'):
@@ -108,12 +118,13 @@ for branch in ('mozilla-beta', 'comm-beta'):
     whitelist[branch]['android-x86'] += ['ac_add_options --enable-updater']
 
 
-for branch in ('mozilla-release', 'comm-release'):
+for branch in ('mozilla-release', 'comm-esr24'):
     for platform in all_platforms:
         whitelist[branch][platform] = [
             'ac_add_options --enable-update-channel=release',
             'ac_add_options --enable-official-branding',
             'mk_add_options MOZ_MAKE_FLAGS="-j4"',
+            'export BUILDING_RELEASE=1',
         ]
     whitelist[branch]['win32'] += ['mk_add_options MOZ_PGO=1',]
     whitelist[branch]['linux'] += [
@@ -144,6 +155,13 @@ for branch in ('mozilla-esr17', 'comm-esr17'):
             'fi',
         ]
 
+for branch in ('mozilla-esr24',):
+    for platform in all_platforms:
+        whitelist[branch][platform] = [
+            'ac_add_options --enable-official-branding',
+            'mk_add_options MOZ_PGO=1',
+            'export BUILDING_RELEASE=1',
+        ]
 
 if __name__ == '__main__':
     import pprint
