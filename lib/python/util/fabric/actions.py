@@ -1,5 +1,5 @@
 from fabric.api import run
-from fabric.context_managers import cd, hide, show
+from fabric.context_managers import cd, hide, show, settings
 from fabric.operations import put
 from fabric.colors import green, red
 import paramiko
@@ -10,10 +10,19 @@ import inspect
 import subprocess
 import time
 
+try:
+    import simplejson as json
+    assert json
+except ImportError:
+    import json
+
+import requests
+
 from util.retry import retry
 
 OK = green('[OK]')
 FAIL = red('[FAIL]')
+SLAVEALLOC = "http://slavealloc.build.mozilla.org/api"
 
 BUILDBOT_WRANGLER = os.path.normpath(os.path.join(
     os.path.dirname(__file__),
@@ -152,7 +161,7 @@ def action_graceful_stop(master):
     print OK, "gracefully stopped %(hostname)s:%(basedir)s" % master
 
 
-def start(master):
+def action_start(master):
     with show('running'):
         with cd(master['basedir']):
             put(BUILDBOT_WRANGLER,
@@ -203,6 +212,45 @@ def action_add_esr24_symlinks(master):
         run('ln -s %(bbconfigs_dir)s/mozilla/l10n-changesets_thunderbird-esr24 '
             '%(master_dir)s/' % master)
     print OK, "Added esr24 symlinks in %(hostname)s:%(basedir)s" % master
+
+
+def action_enable_master(master):
+    # Get the master id
+    # Returns the previous enabled status
+    master = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name']).json()
+    master_id = master['masterid']
+    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': True}))
+    r.raise_for_status()
+    return master['enabled']
+
+
+def action_disable_master(master):
+    # Get the master id
+    # Returns the previous enabled status
+    master = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name']).json()
+    if 'masterid' not in master:
+        return False
+    master_id = master['masterid']
+    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': False}))
+    r.raise_for_status()
+    return master['enabled']
+
+
+def action_upgrade_buildbot(master):
+    print master['name'], "disabling in slavealloc"
+    was_enabled = action_disable_master(master)
+    print master['name'], "gracefully stopping buildbot"
+    action_graceful_stop(master)
+    print master['name'], "updating buildbot"
+    action_update_buildbot(master)
+    print master['name'], "starting buildbot"
+    action_start(master)
+    if was_enabled:
+        print master['name'], "enabling in slavealloc"
+        action_enable_master(master)
+    else:
+        print master['name'], "wasn't enabled; leaving disabled"
+    print OK, master['name'], "done"
 
 
 def per_host(fn):
