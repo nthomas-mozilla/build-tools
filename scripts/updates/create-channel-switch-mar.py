@@ -17,7 +17,6 @@ site.addsitedir(path.join(path.dirname(__file__), "../../lib/python/vendor"))
 
 import requests
 from util.archives import bzip2, unpackmar, packmar
-#from release.updates.snippets import createSnippet, getSnippetPaths
 
 MAR_URL = "http://stage.mozilla.org/pub/mozilla.org/firefox/nightly/%(dir)s/firefox-%(version)s.%(locale)s.%(platform)s.complete.mar"
 CHANNEL_INFO = {
@@ -39,7 +38,7 @@ WORKDIR_NEW_FILES = path.join(WORKDIR, 'new_files')
 WORKDIR_OLD_MAR = path.join(WORKDIR, 'old-mar')
 WORKDIR_UNPACK = path.join(WORKDIR, 'unpacked')
 WORKDIR_NEW_MAR = path.join(WORKDIR, 'new-mar')
-WORKDIR_SNIPPETS = path.join(WORKDIR, 'snippets')
+
 
 def setup_newfiles(channel, mac=False):
     makedirs(WORKDIR_NEW_FILES)
@@ -117,10 +116,6 @@ def modify_manifests(new_files):
 
     return files
 
-def create_snippet(mar_file):
-    log.info('Creating snippet for %s' % mar_file)
-    # call snippet func we already have
-
 def repack_mar(locale, platform, new_files):
     mar_url = constructUrl(args.to_channel, locale, platform, args.to_version)
     mar_file = download_file(mar_url, dest=path.join(WORKDIR_OLD_MAR, path.basename(mar_url)))
@@ -133,8 +128,8 @@ def repack_mar(locale, platform, new_files):
     packmar(new_mar_file, WORKDIR_UNPACK, CHANNEL_INFO[args.from_channel]['channel_id'], args.from_version)
     return
     #sign mar
-    #create_snippet(new_mar_file)
-    
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
@@ -173,7 +168,6 @@ if __name__ == '__main__':
         log.debug('Removing workdir %s' % path.abspath(WORKDIR))
         rmtree(WORKDIR)
     makedirs(WORKDIR_NEW_MAR)
-    makedirs(WORKDIR_SNIPPETS)
 
     args.from_version  = getVersion(args.from_channel)
     args.to_version = getVersion(args.to_channel)
