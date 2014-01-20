@@ -23,9 +23,8 @@ PLATFORMS = {
     'snowleopard': 'macosx64',
     'lion': 'macosx64',
     'mountainlion': 'macosx64',
-    'xp': 'win32',
+    'mavericks': 'macosx64',
     'xp-ix': 'win32',
-    'win7': 'win32',
     'win7-ix': 'win32',
     'win8': 'win32',
     'w764': 'win64',
@@ -220,9 +219,9 @@ if __name__ == '__main__':
                             'ubuntu32_vm', 'ubuntu64_vm'):
         app_path = "%s/firefox/firefox" % basepath
         poller_cmd = 'tar -xjvf *%s' % options.ext
-    elif options.platform in ('macosx', 'macosx64', 'snowleopard', 'lion', 'mountainlion'):
+    elif options.platform in ('macosx', 'macosx64', 'snowleopard', 'mountainlion', 'mavericks'):
         poller_cmd = '../scripts/buildfarm/utils/installdmg.sh *.dmg'
-    elif options.platform in ('win32', 'win7', 'win7-ix', 'win8', 'win64', 'win764', 'w764', 'xp', 'xp-ix'):
+    elif options.platform in ('win32', 'win7-ix', 'win8', 'win64', 'xp-ix'):
         app_path = "%s/firefox/firefox.exe" % basepath
         # The --exclude=*.app is here to avoid extracting a symlink on win32 that is only
         # relevant to OS X. It would be nice if we could just tell tar to
@@ -256,7 +255,7 @@ if __name__ == '__main__':
             print "TinderboxPrint: <a href=\"http://hg.mozilla.org/projects/addon-sdk/rev/%(sdk_rev)s\">sdk-rev:%(sdk_rev)s</a>\n" % locals()
             sdkdir = os.path.abspath(d)
             print "SDKDIR: %s" % sdkdir
-        if options.platform in ('macosx', 'macosx64', 'snowleopard', 'lion', 'mountainlion'):
+        if options.platform in ('macosx', 'macosx64', 'snowleopard', 'lion', 'mountainlion', 'mavericks'):
             if '.app' in d:
                 app_path = os.path.abspath(d)
                 print "APP_PATH: %s" % app_path

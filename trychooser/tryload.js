@@ -13,13 +13,10 @@ function initLoad() {
     "ubuntu64-vm": 0,
     "macosx64": 0,
     "mac10.6-rev4": 0,
-    "mac10.7": 0,
     "mac10.8": 0,
     "macosx64": 0,
     "win32": 0,
-    "winxp": 0,
     "winxp-ix": 0,
-    "win7": 0,
     "win7-ix": 0,
     "win8": 0,
     "win64": 0,
@@ -32,7 +29,6 @@ function initLoad() {
     "android-x86": 0,
     "tegra": 0,
     "panda": 0,
-    "unagi": 0,
   };
 }
 
@@ -76,7 +72,6 @@ function getTryLoads(callback) {
         totalBuildLoad["android-x86"] = totalBuildLoad["linux64"];
         totalBuildLoad["emulator"] = totalBuildLoad["linux"];
         totalBuildLoad["emulator-jb"] = totalBuildLoad["linux"];
-        totalBuildLoad["unagi"] = totalBuildLoad["linux"];
         totalBuildLoad["linux_gecko"] = totalBuildLoad["linux"];
         totalBuildLoad["linux64_gecko"] = totalBuildLoad["linux"];
         totalBuildLoad["macosx64_gecko"] = totalBuildLoad["macosx64"];
@@ -89,14 +84,10 @@ function getTryLoads(callback) {
         totalTestLoad["linux64-asan"] = totalTestLoad["linux64"];
         // linux64-st-an: N/A
         totalTestLoad["macosx64"] = Math.max(
-                                     Math.max(
                                       load_try_test["mac10.6-rev4"] + load_nontry_test["mac10.6-rev4"],
-                                      load_try_test["mac10.7"] + load_nontry_test["mac10.7"])
-                                    , load_try_test["mac10.8"] + load_nontry_test["mac10.8"]);
+                                      load_try_test["mac10.8"] + load_nontry_test["mac10.8"]);
         totalTestLoad["win32"] = Math.max(
-                                   load_try_test["winxp"] + load_nontry_test["winxp"],
                                    load_try_test["winxp-ix"] + load_nontry_test["winxp-ix"],
-                                   load_try_test["win7"] + load_nontry_test["win7"],
                                    load_try_test["win7-ix"] + load_nontry_test["win7-ix"],
                                    load_try_test["win8"] + load_nontry_test["win8"]);
         totalTestLoad["win64"] = load_try_test["win2012x64"] + load_nontry_test["win2012x64"];
@@ -106,7 +97,7 @@ function getTryLoads(callback) {
         totalTestLoad["android-armv6"] = load_try_test["tegra"] + load_nontry_test["tegra"];
         totalTestLoad["android-noion"] = load_try_test["tegra"] + load_nontry_test["tegra"];
         totalTestLoad["emulator"] = totalTestLoad["linux64"];
-        // emulator-jb, unagi: N/A
+        // emulator-jb: N/A
         callback(totalBuildLoad, totalTestLoad);
       });
     });

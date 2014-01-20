@@ -6,13 +6,6 @@
     ],
     "repo_type": "hg"
   },
-  "profiling": {
-    "repo": "http://hg.mozilla.org/projects/profiling",
-    "graph_branches": [
-      "Profiling"
-    ],
-    "repo_type": "hg"
-  },
   "maple": {
     "repo": "http://hg.mozilla.org/projects/maple",
     "graph_branches": [
@@ -31,20 +24,6 @@
     "repo": "http://hg.mozilla.org/releases/mozilla-release",
     "graph_branches": [
       "Mozilla-Release"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-esr17": {
-    "repo": "http://hg.mozilla.org/releases/mozilla-esr17",
-    "graph_branches": [
-      "Mozilla-Esr17"
-    ],
-    "repo_type": "hg"
-  },
-  "comm-esr17": {
-    "repo": "http://hg.mozilla.org/releases/comm-esr17",
-    "graph_branches": [
-      "Thunderbird-Esr17"
     ],
     "repo_type": "hg"
   },
@@ -84,9 +63,23 @@
     "repo_type": "hg"
   },
   "mozilla-b2g18_v1_1_0_hd": {
-    "repo": "http://hg.mozilla.org/releases/mozilla-b2g18_v1_0_1_hd",
+    "repo": "http://hg.mozilla.org/releases/mozilla-b2g18_v1_1_0_hd",
     "graph_branches": [
       "Mozilla-B2g18-v1.1.0hd"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g26_v1_2": {
+    "repo": "http://hg.mozilla.org/releases/mozilla-b2g26_v1_2",
+    "graph_branches": [
+      "Mozilla-B2g26-v1.2"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g26_v1_2f": {
+    "repo": "http://hg.mozilla.org/releases/mozilla-b2g26_v1_2f",
+    "graph_branches": [
+      "Mozilla-B2g26-v1.2f"
     ],
     "repo_type": "hg"
   },
@@ -258,28 +251,28 @@
     "repo_type": "hg"
   },
   "date": {
-    "repo": "http://hg.mozilla.org/integration/date",
+    "repo": "http://hg.mozilla.org/projects/date",
     "graph_branches": [
       "Date"
     ],
     "repo_type": "hg"
   },
   "fig": {
-    "repo": "http://hg.mozilla.org/integration/fig",
+    "repo": "http://hg.mozilla.org/projects/fig",
     "graph_branches": [
       "Fig"
     ],
     "repo_type": "hg"
   },
   "gum": {
-    "repo": "http://hg.mozilla.org/integration/gum",
+    "repo": "http://hg.mozilla.org/projects/gum",
     "graph_branches": [
       "Gum"
     ],
     "repo_type": "hg"
   },
   "jamun": {
-    "repo": "http://hg.mozilla.org/integration/jamun",
+    "repo": "http://hg.mozilla.org/projects/jamun",
     "graph_branches": [
       "Jamun"
     ],

@@ -64,6 +64,21 @@
                 <span id="build_linux64-st-an" class="build_queue">N/A</span>
             </li>
             <li>
+                <label><input type="checkbox" name="platform" value="linux64-valgrind">linux64 valgrind</label>
+                <span id="test_linux64-valgrind" class="test_queue">N/A</span>
+                <span id="build_linux64-valgrind" class="build_queue">N/A</span>
+            </li>
+            <li>
+                <label><input type="checkbox" name="platform" value="linux64-br-haz">browser rooting analysis</label>
+                <span id="test_linux64-br-haz" class="test_queue">N/A</span>
+                <span id="build_linux64-br-haz" class="build_queue">N/A</span>
+            </li>
+            <li>
+                <label><input type="checkbox" name="platform" value="linux64-sh-haz" class="nondefault">shell rooting analysis</label>
+                <span id="test_linux64-sh-haz" class="test_queue">N/A</span>
+                <span id="build_linux64-sh-haz" class="build_queue">N/A</span>
+            </li>
+            <li>
                 <label><input type="checkbox" name="platform" value="macosx64">macosx64</label>
                 <span id="test_macosx64" class="test_queue">N/A</span>
                 <span id="build_macosx64" class="build_queue">N/A</span>
@@ -109,11 +124,6 @@
                 <span id="build_emulator-jb" class="build_queue">N/A</span>
             </li>
             <li>
-                <label><input type="checkbox" name="platform" value="unagi" data-project="b2g">unagi (B2G device image)</label>
-                <span id="test_unagi" class="test_queue">N/A</span>
-                <span id="build_unagi" class="build_queue">N/A</span>
-            </li>
-            <li>
                 <label><input type="checkbox" name="platform" value="linux_gecko" data-project="b2g">b2g desktop (linux)</label>
                 <span id="test_linux_gecko" class="test_queue">N/A</span>
                 <span id="build_linux_gecko" class="build_queue">N/A</span>
@@ -145,10 +155,6 @@
 
             <li>
               <label><input type="checkbox" value="10.6">OSX 10.6</label>
-            </li>
-
-            <li>
-              <label><input type="checkbox" value="10.7">OSX 10.7</label>
             </li>
 
             <li>

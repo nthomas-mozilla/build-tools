@@ -1,5 +1,9 @@
 --enable-optimize
 --enable-debug
---enable-gczeal
---enable-root-analysis
---disable-threadsafe
+--enable-stdcxx-compat
+--enable-ctypes
+--enable-trace-malloc
+--disable-shared-js
+--enable-exact-rooting
+--enable-gcgenerational
+--enable-threadsafe
