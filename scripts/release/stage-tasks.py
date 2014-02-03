@@ -50,6 +50,26 @@ VIRUS_SCAN_CMD = ['nice', 'ionice', '-c2', '-n7',
                   '--no-summary', '--']
 
 PARTNER_BUNDLE_DIR = '/mnt/netapp/stage/releases.mozilla.com/bundles'
+# Left side is destination relative to PARTNER_BUNDLE_DIR.
+# Right side is source, relative to partner-repacks in the candidates dir.
+PARTNER_BUNDLE_MAPPINGS = {
+    r'msn/international/mac/australia/Firefox\ Setup.dmg': r'msn-australia/mac/en-US/Firefox\ %(version)s.dmg',
+    r'msn/international/mac/canada/Firefox\ Setup.dmg': r'msn-canada/mac/en-US/Firefox\ %(version)s.dmg',
+    r'msn/international/mac/de/Firefox\ Setup.dmg': r'msn-de/mac/de/Firefox\ %(version)s.dmg',
+    r'msn/international/mac/en-GB/Firefox\ Setup.dmg': r'msn-uk/mac/en-GB/Firefox\ %(version)s.dmg',
+    r'msn/international/mac/fr/Firefox\ Setup.dmg': r'msn-fr/mac/fr/Firefox\ %(version)s.dmg',
+    r'msn/international/mac/ja/Firefox\ Setup.dmg': r'msn-ja/mac/ja-JP-mac/Firefox\ %(version)s.dmg',
+    r'msn/us/mac/en-US/Firefox\ Setup.dmg': r'msn-us/mac/en-US/Firefox\ %(version)s.dmg',
+    r'bing/mac/en-US/Firefox-Bing.dmg': r'bing/mac/en-US/Firefox\ %(version)s.dmg',
+    r'msn/international/win32/australia/Firefox\ Setup.exe': r'msn-australia/win32/en-US/Firefox\ Setup\ %(version)s.exe',
+    r'msn/international/win32/canada/Firefox\ Setup.exe': r'msn-canada/win32/en-US/Firefox\ Setup\ %(version)s.exe',
+    r'msn/international/win32/de/Firefox\ Setup.exe': r'msn-de/win32/de/Firefox\ Setup\ %(version)s.exe',
+    r'msn/international/win32/en-GB/Firefox\ Setup.exe': r'msn-uk/win32/en-GB/Firefox\ Setup\ %(version)s.exe',
+    r'msn/international/win32/fr/Firefox\ Setup.exe': r'msn-fr/win32/fr/Firefox\ Setup\ %(version)s.exe',
+    r'msn/international/win32/ja/Firefox\ Setup.exe': r'msn-ja/win32/ja/Firefox\ Setup\ %(version)s.exe',
+    r'msn/us/win32/en-US/Firefox\ Setup.exe': r'msn-us/win32/en-US/Firefox\ Setup\ %(version)s.exe',
+    r'bing/win32/en-US/Firefox-Bing\ Setup.exe': r'bing/win32/en-US/Firefox\ Setup\ %(version)s.exe',
+}
 
 def validate(options, args):
     if not options.configfile:
@@ -201,25 +221,13 @@ def doSyncPartnerBundles(productName, version, buildNumber, stageServer,
                          stageUsername, stageSshKey):
     candidates_dir = makeCandidatesDir(productName, version, buildNumber)
 
-    # Sync the Bing packages...
-    bing_dir = '%s/partner-repacks/bing' % candidates_dir
-    mac_bing_src = '%s/mac/en-US/Firefox\\ %s.dmg' % (bing_dir, version)
-    mac_bing_dst = '%s/bing/mac/en-US/Firefox-Bing.dmg' % PARTNER_BUNDLE_DIR
-    win32_bing_src = '%s/win32/en-US/Firefox\\ Setup\\ %s.exe' % (bing_dir, version)
-    win32_bing_dst = '%s/bing/win32/en-US/Firefox-Bing\\ Setup.exe' % PARTNER_BUNDLE_DIR
-    run_remote_cmd(['cp', '-f', mac_bing_src, mac_bing_dst],
-        server=stageServer, username=stageUsername, sshKey=stageSshKey
-    )
-    run_remote_cmd(['cp', '-f', win32_bing_src, win32_bing_dst],
-        server=stageServer, username=stageUsername, sshKey=stageSshKey
-    )
-
-    # Sync the MSN packages...
-    run_remote_cmd(
-        ['rsync', '-av', '%s/partner-repacks/msn*' % candidates_dir,
-         PARTNER_BUNDLE_DIR],
-        server=stageServer, username=stageUsername, sshKey=stageSshKey
-    )
+    for dest, src in PARTNER_BUNDLE_MAPPINGS.iteritems():
+        full_dest = path.join(PARTNER_BUNDLE_DIR, dest)
+        full_src = path.join(candidates_dir, 'partner-repacks', src)
+        full_src = full_src % {'version': version}
+        run_remote_cmd(['cp', '-f', full_src, full_dest],
+            server=stageServer, username=stageUsername, sshKey=stageSshKey
+        )
 
     # And fix the permissions...
     run_remote_cmd(
