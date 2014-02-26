@@ -22,7 +22,7 @@ site.addsitedir(path.join(path.dirname(path.realpath(__file__)), "../../lib/pyth
 
 from util.retry import retry
 
-MAX_WORKERS = 4
+MAX_WORKERS = 16
 IDLE_THRESHOLD = 5*60*60
 PENDING, RUNNING, SUCCESS, FAILURE = range(4)
 
@@ -68,8 +68,8 @@ def process_slave(slaveapi, slave, dryrun=False):
         url.path.add("slaves").add(slave).add("actions").add("shutdown_buildslave")
         url.args["waittime"] = 30
         r = retry(requests.post, args=(str(url),)).json()
-        while r["state"] not in (PENDING, RUNNING):
-            url.args["requestid"] = r["requestid"]
+        url.args["requestid"] = r["requestid"]
+        while r["state"] in (PENDING, RUNNING):
             time.sleep(30)
             r = retry(requests.get, args=(str(url),)).json()
 
