@@ -54,7 +54,7 @@
                 <span id="build_linux64" class="build_queue">N/A</span>
             </li>
             <li>
-                <label><input type="checkbox" name="platform" value="linux64-asan" class="nondefault">linux64-asan</label>
+                <label><input type="checkbox" name="platform" value="linux64-asan">linux64-asan</label>
                 <span id="test_linux64-asan" class="test_queue">N/A</span>
                 <span id="build_linux64-asan" class="build_queue">N/A</span>
             </li>
@@ -104,11 +104,6 @@
                 <span id="build_android-armv6" class="build_queue">N/A</span>
             </li>
             <li>
-                <label><input type="checkbox" name="platform" value="android-noion" data-project="android">android-noion (Android 2.2)</label>
-                <span id="test_android-noion" class="test_queue">N/A</span>
-                <span id="build_android-noion" class="build_queue">N/A</span>
-            </li>
-            <li>
                 <label><input type="checkbox" name="platform" value="android-x86" data-project="android">android-x86 (Android 4.2)</label>
                 <span id="test_android-x86" class="test_queue">N/A</span>
                 <span id="build_android-x86" class="build_queue">N/A</span>
@@ -124,9 +119,14 @@
                 <span id="build_emulator-jb" class="build_queue">N/A</span>
             </li>
             <li>
-                <label><input type="checkbox" name="platform" value="linux_gecko" data-project="b2g">b2g desktop (linux)</label>
-                <span id="test_linux_gecko" class="test_queue">N/A</span>
-                <span id="build_linux_gecko" class="build_queue">N/A</span>
+                <label><input type="checkbox" name="platform" value="emulator-kk" data-project="b2g">emulator-kk (B2G ARM, KK)</label>
+                <span id="test_emulator-kk" class="test_queue">N/A</span>
+                <span id="build_emulator-kk" class="build_queue">N/A</span>
+            </li>
+            <li>
+                <label><input type="checkbox" name="platform" value="linux32_gecko" data-project="b2g">b2g desktop (linux)</label>
+                <span id="test_linux32_gecko" class="test_queue">N/A</span>
+                <span id="build_linux32_gecko" class="build_queue">N/A</span>
             </li>
             <li>
                 <label><input type="checkbox" name="platform" value="linux64_gecko" data-project="b2g">b2g desktop (linux64)</label>
@@ -137,6 +137,11 @@
                 <label><input type="checkbox" name="platform" value="macosx64_gecko" data-project="b2g">b2g desktop (macosx64)</label>
                 <span id="test_macosx64_gecko" class="test_queue">N/A</span>
                 <span id="build_macosx64_gecko" class="build_queue">N/A</span>
+            </li>
+            <li>
+                <label><input type="checkbox" name="platform" value="win32_gecko" data-project="b2g">b2g desktop (win32)</label>
+                <span id="test_win32_gecko" class="test_queue">N/A</span>
+                <span id="build_win32_gecko" class="build_queue">N/A</span>
             </li>
             </ul>
             </div>
@@ -252,6 +257,7 @@
             <li><label><input type="checkbox" value="crashtest-2">crashtest-2 <span class="info">(only x86)</span></label></li>
             <li><label><input type="checkbox" value="crashtest-3">crashtest-3 <span class="info">(only x86)</span></label></li>
             <li><label><input type="checkbox" value="xpcshell">xpcshell (only x86)</label></li>
+            <li><label><input type="checkbox" value="cppunittest">cppunittest</label></li>
             </ul>
             <h4>B2G-Only Unittest Suites</h4>
             <ul>
@@ -271,6 +277,7 @@
             <li><label><input type="checkbox" value="marionette-webapi">marionette-webapi</label></li>
             <li><label><input type="checkbox" value="gaia-unit">gaia-unit-tests</label></li>
             <li><label><input type="checkbox" value="gaia-ui-test">gaia-ui-tests</label></li>
+            <li><label><input type="checkbox" value="gaia-integration">gaia-integration-tests</label></li>
             </ul>
             </div>
         </div> <!-- col2 div -->
