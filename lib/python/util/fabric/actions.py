@@ -433,3 +433,13 @@ for x in gc.get_referrers(master.parent):
         log.im_self.write.im_self.rotateLength = 50000000
         break
 """)
+
+
+def action_set_max_broker_refs(master):
+    lines = manhole_action(master, """\
+import twisted.spread.pb
+twisted.spread.pb.MAX_BROKER_REFS = 4096
+print twisted.spread.pb.MAX_BROKER_REFS
+""")
+    for line in lines:
+        print line,
