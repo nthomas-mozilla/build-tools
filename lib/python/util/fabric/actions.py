@@ -157,12 +157,22 @@ def action_restart(master):
 
 
 def action_graceful_restart(master):
+    print master['name'], "disabling in slavealloc"
+    was_enabled = action_disable_master(master)
+
     with show('running'):
         put(BUILDBOT_WRANGLER, '%s/buildbot-wrangler.py' %
             master['basedir'])
         run('rm -f *.pyc', workdir=master['basedir'])
         run('python buildbot-wrangler.py graceful_restart %s %s' %
             (master['master_dir'], master['http_port']), workdir=master['basedir'])
+
+    if was_enabled:
+        print master['name'], "enabling in slavealloc"
+        action_enable_master(master)
+    else:
+        print master['name'], "wasn't enabled; leaving disabled"
+
     print OK, \
         "finished gracefully restarting of %(hostname)s:%(basedir)s" % master
 
