@@ -23,7 +23,7 @@ from util.retry import retry
 
 OK = green('[OK]')
 FAIL = red('[FAIL]')
-SLAVEALLOC = "http://slavealloc.build.mozilla.org/api"
+SLAVEALLOC = "https://secure.pub.build.mozilla.org/slavealloc/api"
 
 BUILDBOT_WRANGLER = os.path.normpath(os.path.join(
     os.path.dirname(__file__),
