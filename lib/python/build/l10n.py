@@ -72,12 +72,12 @@ def l10nRepackPrep(sourceRepoName, objdir, mozconfigPath, srcMozconfigPath,
     run_cmd(["mkdir", "-p", "l10n"])
 
     if tooltoolManifest:
-        cmd = ['sh', 'scripts/scripts/tooltool/tooltool_wrapper.sh',
-               os.path.join(sourceRepoName, tooltoolManifest),
+        cmd = ['sh', '../scripts/scripts/tooltool/tooltool_wrapper.sh',
+               tooltoolManifest,
                tooltool_urls[0],  # TODO: pass all urls when tooltool ready
                'setup.sh']
         cmd.extend(tooltool_script)
-        run_cmd(cmd)
+        run_cmd(cmd, cwd=sourceRepoName)
 
     absSourceRepoPath = os.path.join(os.getcwd(), sourceRepoName)
     make = getMakeCommand(env.get("USE_PYMAKE"), absSourceRepoPath)
@@ -100,15 +100,12 @@ def repackLocale(locale, l10nRepoDir, l10nBaseRepo, revision, localeSrcDir,
                  l10nIni, compareLocalesRepo, env, absObjdir, merge=True,
                  productName=None, platform=None,
                  version=None, partialUpdates=None,
-                 buildNumber=None, stageServer=None):
+                 buildNumber=None, stageServer=None,
+                 mozillaDir=None, mozillaSrcDir=None):
     repo = "/".join([l10nBaseRepo, locale])
     localeDir = path.join(l10nRepoDir, locale)
     retry(mercurial, args=(repo, localeDir))
     update(localeDir, revision=revision)
-
-    mozillaDir = ''
-    if 'thunderbird' in productName:
-        mozillaDir = 'mozilla/'
 
     # It's a bad assumption to make, but the source dir is currently always
     # one level above the objdir.
@@ -126,8 +123,12 @@ def repackLocale(locale, l10nRepoDir, l10nBaseRepo, revision, localeSrcDir,
     if sys.platform.startswith('darwin'):
         env["MOZ_PKG_PLATFORM"] = "mac"
     UPLOAD_EXTRA_FILES = []
-    nativeDistDir = path.normpath(path.abspath(
-        path.join(localeSrcDir, '../../%sdist' % mozillaDir)))
+    if mozillaDir:
+        nativeDistDir = path.normpath(path.abspath(
+            path.join(localeSrcDir, '../../%s/dist' % mozillaDir)))
+    else:
+        nativeDistDir = path.normpath(path.abspath(
+            path.join(localeSrcDir, '../../dist')))
     posixDistDir = windows2msys(nativeDistDir)
     mar = '%s/host/bin/mar' % posixDistDir
     mbsdiff = '%s/host/bin/mbsdiff' % posixDistDir
@@ -143,10 +144,15 @@ def repackLocale(locale, l10nRepoDir, l10nBaseRepo, revision, localeSrcDir,
     unwrap_full_update = '../../../tools/update-packaging/unwrap_full_update.pl'
     make_incremental_update = '../../tools/update-packaging/make_incremental_update.sh'
     prevMarDir = '../../../../'
-    if mozillaDir:
-        unwrap_full_update = '../../../../%stools/update-packaging/unwrap_full_update.pl' % mozillaDir
-        make_incremental_update = '../../../%stools/update-packaging/make_incremental_update.sh' % mozillaDir
-        prevMarDir = '../../../../../'
+    if mozillaSrcDir:
+        # Compensate for having the objdir or not.
+        additionalParent = ''
+        if mozillaDir:
+            additionalParent = '../'
+
+        unwrap_full_update = '../../../%s%s/tools/update-packaging/unwrap_full_update.pl' % (additionalParent, mozillaSrcDir)
+        make_incremental_update = '../../%s%s/tools/update-packaging/make_incremental_update.sh' % (additionalParent, mozillaSrcDir)
+        prevMarDir = '../../../../%s' % additionalParent
     env['MAR'] = mar
     env['MBSDIFF'] = mbsdiff
 
@@ -179,7 +185,8 @@ def repackLocale(locale, l10nRepoDir, l10nBaseRepo, revision, localeSrcDir,
                    l10nIni, revision=revision, merge=merge)
     run_cmd(make + ["installers-%s" % locale], cwd=localeSrcDir, env=env)
 
-    run_cmd(['rm', '-rf', current])
+    # Our Windows-native rm from bug 727551 requires Windows-style paths
+    run_cmd(['rm', '-rf', msys2windows(current)])
     run_cmd(['mkdir', current])
     run_cmd(['perl', unwrap_full_update, current_mar],
             cwd=path.join(nativeDistDir, 'current'), env=env)
@@ -190,7 +197,8 @@ def repackLocale(locale, l10nRepoDir, l10nBaseRepo, revision, localeSrcDir,
                                                          version)
             partial_mar = '%s/%s' % (updateAbsDir, partial_mar_name)
             UPLOAD_EXTRA_FILES.append('%s/%s' % (updateDir, partial_mar_name))
-            run_cmd(['rm', '-rf', previous])
+            # Our Windows-native rm from bug 727551 requires Windows-style paths
+            run_cmd(['rm', '-rf', msys2windows(previous)])
             run_cmd(['mkdir', previous])
             run_cmd(
                 ['perl', unwrap_full_update, '%s/%s' % (prevMarDir, prevMar)],

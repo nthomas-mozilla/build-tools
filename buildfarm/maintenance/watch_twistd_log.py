@@ -31,13 +31,106 @@ def find_files(dirs, lasttime):
     return [r[1] for r in retval]
 
 
+def unauthorized_logins(hostname, excs, name):
+    import socket
+
+    pattern = re.compile("(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d-\d\d\d\d) \[Broker,\d+,(\d+.\d+.\d+.\d+)\]")
+    unauthorized_hosts = {}
+    remaining_excs = []
+    example = ""
+
+    for e in excs:
+        m = pattern.search(e)
+        if e.find("Failure: twisted.cred.error.UnauthorizedLogin:") >= 0 and m and m.groups:
+            if unauthorized_hosts.has_key(m.group(2)):
+                unauthorized_hosts[m.group(2)]['count'] += 1;
+                unauthorized_hosts[m.group(2)]['last'] = str(m.group(1))
+            else:
+                unauthorized_hosts[m.group(2)] = {}
+                unauthorized_hosts[m.group(2)]['count'] = 1;
+                unauthorized_hosts[m.group(2)]['first'] = str(m.group(1))
+                unauthorized_hosts[m.group(2)]['last'] = str(m.group(1))
+                try:
+                    unauthorized_hosts[m.group(2)]['hostname'] = socket.gethostbyaddr(m.group(2))[0]
+                except socket.herror:
+                    unauthorized_hosts[m.group(2)]['hostname'] = "unknown"
+            if example == "":
+                example = e
+        else:
+            remaining_excs.append(e)
+
+    msg = ""
+    for ip in unauthorized_hosts:
+        msg = "% 10d - %s (%s) - %s\n" % (unauthorized_hosts[ip]['count'],
+                                          unauthorized_hosts[ip]['hostname'],
+                                          ip,
+                                          unauthorized_hosts[ip]['last'])
+    if msg != "":
+        prepend =  "The following slaves tried to connect unsuccessfully to %s %s:\n" % (hostname, name)
+        prepend += "# attempts - hostname (ip) - last seen\n"
+        msg = prepend + msg
+        msg += "\nExample:\n\n"
+        msg += example
+
+    return msg, remaining_excs
+
+
+def format_exceptions(hostname, excs, name):
+    repeat_pattern_funcs = [
+        unauthorized_logins,
+    ]
+
+    msg = ""
+    for f in repeat_pattern_funcs:
+        if excs:
+            repeat_msg, excs = f(hostname, excs, name)
+            if repeat_msg != "":
+                msg += repeat_msg
+                msg += "\n" + "-" * 80 + "\n"
+
+    if excs:
+        matched_excs = {}
+        for exc in excs:
+            lines = exc.split("\n")
+            key = "\n".join(lines[2:])
+            parsed_ts =  ' '.join(lines[1].split(' ')[:2])
+            if matched_excs.has_key(key):
+                matched_excs[key]['count'] += 1
+                if parsed_ts > matched_excs[key]['most_recent']:
+                    matched_excs[key]['most_recent'] = parsed_ts
+                    continue
+                if parsed_ts < matched_excs[key]['first']:
+                    matched_excs[key]['first'] = parsed_ts
+                    continue
+            else:
+                matched_excs[key] = {}
+                matched_excs[key]['count'] = 1
+                matched_excs[key]['example'] = exc
+                matched_excs[key]['exception'] = lines[-2].strip()
+                matched_excs[key]['first'] = parsed_ts
+                matched_excs[key]['most_recent'] = parsed_ts
+        if msg == "":
+            msg = "The following exceptions"
+        else:
+            msg += "The following other exceptions"
+        msg += " (total %i) were detected on %s %s:\n" % (
+            len(excs), hostname, name)
+        for exc_key in sorted(matched_excs, key=lambda x: (matched_excs[x]['count'], x), reverse=True):
+            msg += "\n" + "-" * 80 + "\n"
+            msg += "Count: %d, " % matched_excs[exc_key]['count']
+            msg += "Exception: %s\n" % matched_excs[exc_key]['exception']
+            msg += "First instance: %s, Most recent instance: %s\n" % (matched_excs[exc_key]['first'],
+                                                                       matched_excs[exc_key]['most_recent'])
+            msg += "Example:\n"
+            msg += matched_excs[exc_key]['example']
+    return msg
+
 def send_msg(fromaddr, emails, hostname, excs, name):
     """Send an email to each address in `emails`, from `fromaddr`
 
     The message will contain the hostname and list of exceptions `excs`"""
-    msg = "The following exceptions (total %i) were detected on %s %s:\n\n" % (
-        len(excs), hostname, name)
-    msg += ("\n" + "-" * 80 + "\n").join(excs)
+
+    msg = format_exceptions(hostname, excs, name)
 
     s = SMTP()
     s.connect()
@@ -77,6 +170,8 @@ class Scanner:
         re.compile(re.escape("exceptions.AttributeError: 'NoneType' object has no attribute")),
         # Ignore PB connect errors.
         re.compile(re.escape("Failure: twisted.spread.pb.PBConnectionLost: [Failure instance: Traceback (failure with no frames): <class 'socket.error'>: [Errno 9] Bad file descriptor")),
+        # Ignore AbandonChain errors
+        re.compile(re.escape("Failure: buildslave.exceptions.AbandonChain")),
     ]
 
     def __init__(self, lasttime=0):

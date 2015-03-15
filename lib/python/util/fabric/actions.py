@@ -224,6 +224,10 @@ def action_update_buildbot(master):
             master['buildbot_python'], workdir=buildbot_dir)
     print OK, "updated buildbot in %(hostname)s:%(basedir)s" % master
 
+def action_uptime(master):
+    with hide('stdout', 'stderr', 'running'):
+        uptime = run('uptime')
+        print "%-25s %12s" % (master['name'], uptime)
 
 def action_fix_makefile_symlink(master):
     with show('running'):
@@ -233,17 +237,37 @@ def action_fix_makefile_symlink(master):
     print OK, "updated Makefile symlink in %(hostname)s:%(basedir)s" % master
 
 
-def action_add_esr24_symlinks(master):
+def action_add_esr31_symlinks(master):
     with show('running'):
-        run('ln -s %(bbconfigs_dir)s/mozilla/release-firefox-mozilla-esr24.py '
+        run('ln -s %(bbconfigs_dir)s/mozilla/release-firefox-mozilla-esr31.py '
             '%(master_dir)s/' % master)
-        run('ln -s %(bbconfigs_dir)s/mozilla/l10n-changesets_mozilla-esr24 '
+        run('ln -s %(bbconfigs_dir)s/mozilla/l10n-changesets_mozilla-esr31 '
             '%(master_dir)s/' % master)
-        run('ln -s %(bbconfigs_dir)s/mozilla/release-thunderbird-comm-esr24.py '
+        run('ln -s %(bbconfigs_dir)s/mozilla/release-thunderbird-comm-esr31.py '
             '%(master_dir)s/' % master)
-        run('ln -s %(bbconfigs_dir)s/mozilla/l10n-changesets_thunderbird-esr24 '
+        run('ln -s %(bbconfigs_dir)s/mozilla/l10n-changesets_thunderbird-esr31 '
             '%(master_dir)s/' % master)
-    print OK, "Added esr24 symlinks in %(hostname)s:%(basedir)s" % master
+    print OK, "Added esr31 symlinks in %(hostname)s:%(basedir)s" % master
+
+
+def action_rm_34_1_symlinks(master):
+    with show('running'):
+        run('rm -f %(master_dir)s/release-firefox-mozilla-release-34.1.py' %
+            master)
+        run('rm -f %(master_dir)s/l10n-changesets_mozilla-release-34.1' %
+            master)
+    print OK, "Removed 34.1 symlinks in %(hostname)s:%(basedir)s" % master
+
+
+def action_add_gecko_version_symlinks(master):
+    with show('running'):
+        run('ln -s %(bbconfigs_dir)s/mozilla/gecko_versions.json '
+            '%(master_dir)s/' % master)
+
+
+def action_update_exception_timestamp(master):
+    with show('running'):
+        run('date +%s > /home/cltbld/.{0}-last-time.txt'.format(master['name']))
 
 
 def action_enable_master(master):
@@ -312,7 +336,6 @@ def action_retry_dead_queue(host):
                     run("rm %s" % f)
                 else:
                     run("mv %s /dev/shm/queue/%s/new" % (f, q))
-
 
 def manhole_action(master, commands):
     print "Starting ssh tunnel to", master['hostname']
@@ -453,3 +476,8 @@ print twisted.spread.pb.MAX_BROKER_REFS
 """)
     for line in lines:
         print line,
+
+def action_master_health(master):
+    with show('running'):
+        run('ls -l %(master_dir)s/*.pid' % master)
+        run('free -m')

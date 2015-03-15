@@ -1,4 +1,5 @@
 import time
+import random
 from functools import wraps
 from contextlib import contextmanager
 import logging
@@ -28,7 +29,7 @@ def retry(action, attempts=5, sleeptime=60, max_sleeptime=5 * 60,
     while n <= attempts:
         try:
             log.info("retry: Calling %s with args: %s, kwargs: %s, "
-                     "attempt #%d" % (action, str(args), str(kwargs), n))
+                     "attempt #%d" % (action.__name__, str(args), str(kwargs), n))
             return action(*args, **kwargs)
         except retry_exceptions:
             log.debug("retry: Caught exception: ", exc_info=True)
@@ -76,3 +77,19 @@ def retrying(func, *retry_args, **retry_kwargs):
         return retry(func, args=args, kwargs=kwargs, *retry_args,
                      **retry_kwargs)
     yield retry_it
+
+
+def retrier(attempts=5, sleeptime=10, max_sleeptime=300, sleepscale=1.5, jitter=1):
+    for _ in range(attempts):
+        log.debug("attempt %i/%i", _ + 1, attempts)
+        yield
+        if jitter:
+            sleeptime += random.randint(-jitter, jitter)
+        if _ == attempts - 1:
+            # Don't need to sleep the last time
+            break
+        log.debug("sleeping for %.2fs (attempt %i/%i)", sleeptime, _ + 1, attempts)
+        time.sleep(sleeptime)
+        sleeptime *= sleepscale
+        if sleeptime > max_sleeptime:
+            sleeptime = max_sleeptime

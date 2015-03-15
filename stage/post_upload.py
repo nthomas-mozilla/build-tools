@@ -10,14 +10,16 @@
 # This script expects a directory as its first non-option argument,
 # followed by a list of filenames.
 
+import calendar
 import sys
 import os
 import os.path
+import pytz
 import shutil
 import re
 import tempfile
+from datetime import datetime
 from optparse import OptionParser
-from time import mktime, strptime
 from errno import EEXIST
 from ConfigParser import RawConfigParser
 
@@ -86,8 +88,8 @@ def CopyFileToDir(original_file, source_dir, dest_dir, preserve_dirs=False):
             # If the file gets deleted by another instance of post_upload
             # because there was a name collision this improves the situation
             # as to not abort the process but continue with the next file
-            print "Warning: The file %s has already been unlinked by " + \
-                  "another instance of post_upload.py" % new_file
+            print "Warning: The file %s has already been unlinked by " % new_file + \
+                  "another instance of post_upload.py"
             return
 
     # Try hard linking the file
@@ -129,7 +131,8 @@ def BuildIDToDict(buildid):
 def BuildIDToUnixTime(buildid):
     """Returns the timestamp the buildid represents in unix time."""
     try:
-        return int(mktime(strptime(buildid, "%Y%m%d%H%M%S")))
+        pt = pytz.timezone('US/Pacific')
+        return calendar.timegm(pt.localize(datetime.strptime(buildid, "%Y%m%d%H%M%S")).utctimetuple())
     except:
         raise "Could not parse buildid!"
 
@@ -193,7 +196,7 @@ def ReleaseToLatest(options, upload_dir, files):
         elif filename in ('mar', 'mar.exe', 'mbsdiff', 'mbsdiff.exe'):
             if options.tinderbox_builds_dir:
                 platform = options.tinderbox_builds_dir.split('-')[-1]
-                if platform in ('win32', 'macosx64', 'linux', 'linux64'):
+                if platform in ('win32', 'macosx64', 'linux', 'linux64', 'win64'):
                     CopyFileToDir(f, upload_dir, '%s/%s' % (marToolsPath, platform))
         else:
             CopyFileToDir(f, upload_dir, latestPath)
@@ -316,7 +319,7 @@ def ReleaseToCandidatesDir(options, upload_dir, files):
         if filename in ('mar', 'mar.exe', 'mbsdiff', 'mbsdiff.exe'):
             if options.tinderbox_builds_dir:
                 platform = options.tinderbox_builds_dir.split('-')[-1]
-                if platform in ('win32', 'macosx64', 'linux', 'linux64'):
+                if platform in ('win32', 'macosx64', 'linux', 'linux64', 'win64'):
                     CopyFileToDir(f, upload_dir, '%s/%s' % (marToolsPath, platform))
         else:
             CopyFileToDir(f, upload_dir, realCandidatesPath, preserve_dirs=True)
@@ -359,12 +362,6 @@ def ReleaseToMobileCandidatesDir(options, upload_dir, files):
         # We always want release files chmod'ed this way so other users in
         # the group cannot overwrite them.
         os.chmod(f, 0644)
-
-    # Same thing for directories, but 0755
-    for root, dirs, files in os.walk(candidatesPath):
-        for d in dirs:
-            os.chmod(os.path.join(root, d), 0755)
-
 
 def ReleaseToTryBuilds(options, upload_dir, files):
     tryBuildsPath = TRY_DIR % {'product': options.product,

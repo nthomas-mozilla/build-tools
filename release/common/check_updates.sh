@@ -28,7 +28,7 @@ check_updates () {
           updater="Contents/MacOS/updater.app/Contents/MacOS/updater"
           binary_file_pattern='^Binary files'
           ;;
-      WINNT_x86-msvc) 
+      WINNT*) 
           platform_dirname="bin"
           updater="updater.exe"
           binary_file_pattern='^Files.*and.*differ$'
@@ -47,9 +47,9 @@ check_updates () {
     cd source/$platform_dirname;
     cp $updater ../../update
     if [ "$use_old_updater" = "1" ]; then
-        ../../update/updater ../../update 0
-    else
         ../../update/updater ../../update . 0
+    else
+        ../../update/updater ../../update . . 0
     fi
     cd ../..
   else

@@ -41,7 +41,7 @@ class API(object):
     url_template = None
     prerequest_url_template = None
 
-    def __init__(self, api_root='https://aus4-admin-dev.allizom.org',
+    def __init__(self, api_root='https://aus4-admin-dev.allizom.org/api',
                  auth=None, ca_certs=CA_BUNDLE, timeout=60, raise_exceptions=True):
         """ Creates an API object which wraps REST API of Balrog server.
 
@@ -110,7 +110,8 @@ class API(object):
             logging.debug('Data sent: %s' % sanitised_data)
         else:
             logging.debug('Data sent: %s' % data)
-        headers = {'Accept-Encoding': 'application/json'}
+        headers = {'Accept-Encoding': 'application/json',
+                   'Accept': 'application/json'}
         try:
             return self.session.request(method=method, url=url, data=data,
                                         config=self.config, timeout=self.timeout,
@@ -126,11 +127,13 @@ class Release(API):
     prerequest_url_template = '/releases/%(name)s'
 
     def update_release(self, name, version, product, hashFunction, releaseData,
-                       data_version=None):
+                       data_version=None, schemaVersion=None):
         data = dict(name=name, version=version, product=product,
                     hashFunction=hashFunction, data=releaseData)
         if data_version:
             data['data_version'] = data_version
+        if schemaVersion:
+            data['schema_version'] = schemaVersion
         return self.request(method='POST', data=data, url_template_vars=dict(name=name))
 
     def get_data(self, name):
@@ -143,7 +146,8 @@ class SingleLocale(API):
     prerequest_url_template = '/releases/%(name)s'
 
     def update_build(self, name, product, version, build_target, locale,
-                     hashFunction, buildData, copyTo=None, alias=None):
+                     hashFunction, buildData, copyTo=None, alias=None,
+                     schemaVersion=None):
         url_template_vars = dict(api_root=self.api_root, name=name,
                                  locale=locale, build_target=build_target)
         data = dict(product=product, version=version,
@@ -152,6 +156,8 @@ class SingleLocale(API):
             data['copyTo'] = copyTo
         if alias:
             data['alias'] = alias
+        if schemaVersion:
+            data['schema_version'] = schemaVersion
 
         return self.request(method='PUT', data=data,
                             url_template_vars=url_template_vars)
@@ -165,3 +171,7 @@ class Rule(API):
         url_template_vars = {'rule_id': rule_id}
         return self.request(method='POST', data=rule_data,
                             url_template_vars=url_template_vars)
+
+    def get_data(self, rule_id):
+        resp = self.request(url_template_vars=dict(rule_id=rule_id))
+        return (json.loads(resp.content), resp.headers["X-Data-Version"])

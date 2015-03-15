@@ -5,6 +5,7 @@ import time
 import logging
 import sys
 import os
+import json
 from os import path
 from optparse import OptionParser
 from smtplib import SMTPException
@@ -30,8 +31,6 @@ from util.sendmail import sendmail
 from util.file import load_config, get_config
 
 log = logging.getLogger(__name__)
-
-HG = 'hg.mozilla.org'
 
 
 def reconfig_warning(from_, to, smtp_server, rr, start_time, elapsed,
@@ -88,7 +87,7 @@ class ReleaseRunner(object):
             log.warning('Caught HTTPError: %s' % e.response.content)
             log.warning('status update failed, continuing...', exc_info=True)
 
-    def start_release_automation(self, release, master):
+    def start_release_automation(self, release, master, enUSPlatforms):
         sendchange(
             release['branch'],
             getReleaseTag(getBaseTag(release['product'],
@@ -97,12 +96,13 @@ class ReleaseRunner(object):
             master,
             release['product']
         )
-        self.mark_as_completed(release)
+        self.mark_as_completed(release, enUSPlatforms)
 
-    def mark_as_completed(self, release):
+    def mark_as_completed(self, release, enUSPlatforms):
         log.info('mark as completed %s' % release['name'])
-        self.release_api.update(
-            release['name'], complete=True, status='Started')
+        self.release_api.update(release['name'], complete=True,
+                                status='Started',
+                                enUSPlatforms=json.dumps(enUSPlatforms))
 
     def mark_as_failed(self, release, why):
         log.info('mark as failed %s' % release['name'])
@@ -201,6 +201,51 @@ def get_release_sanity_args(configs_workdir, release, cfgFile, masters_json,
     return args
 
 
+def sendMailRD(smtpServer, From, cfgFile, r):
+    # Send an email to the mailing after the build
+    contentMail = ""
+    release_config = readReleaseConfig(cfgFile)
+    sources = release_config['sourceRepositories']
+    To = release_config['ImportantRecipients']
+    comment = r.get("comment")
+
+    if comment:
+        contentMail += "Comment:\n" + comment + "\n\n"
+
+    contentMail += "A new build has been submitted through ship-it:\n"
+
+    for name, source in sources.items():
+
+        if name == "comm":
+            # Thunderbird
+            revision = source["revision"]
+            path = source["path"]
+        else:
+            revision = source["revision"]
+            path = source["path"]
+
+        # For now, firefox has only one source repo but Thunderbird has two
+        contentMail += name + " commit: https://hg.mozilla.org/" + path + "/rev/" + revision + "\n"
+
+    contentMail += "\nCreated by " + r["submitter"] + "\n"
+
+    contentMail += "\nStarted by " + r["starter"] + "\n"
+
+    subjectPrefix = ""
+
+    # On r-d, we prefix the subject of the email in order to simplify filtering
+    # We don't do it for thunderbird
+    if "Fennec" in r["name"]:
+        subjectPrefix = "[mobile] "
+    if "Firefox" in r["name"]:
+        subjectPrefix = "[desktop] "
+
+    Subject = subjectPrefix + 'Build of %s' % r["name"]
+
+    sendmail(from_=From, to=To, subject=Subject, body=contentMail,
+             smtp_server=smtpServer)
+
+
 def main(options):
     log.info('Loading config from %s' % options.config)
     config = load_config(options.config)
@@ -222,6 +267,7 @@ def main(options):
     api_root = config.get('api', 'api_root')
     username = config.get('api', 'username')
     password = config.get('api', 'password')
+    hg_host = config.get('release-runner', 'hg_host')
     hg_username = config.get('release-runner', 'hg_username')
     hg_ssh_key = config.get('release-runner', 'hg_ssh_key')
     buildbot_configs = config.get('release-runner', 'buildbot_configs')
@@ -247,18 +293,18 @@ def main(options):
     custom_workdir = 'buildbotcustom'
     tools_workdir = 'tools'
     if "://" in buildbot_configs and not buildbot_configs.startswith("file"):
-        configs_pushRepo = make_hg_url(HG, get_repo_path(buildbot_configs),
-                                    protocol='ssh')
+        configs_pushRepo = make_hg_url(
+            hg_host, get_repo_path(buildbot_configs), protocol='ssh')
     else:
         configs_pushRepo = buildbot_configs
     if "://" in buildbotcustom and not buildbotcustom.startswith("file"):
-        custom_pushRepo = make_hg_url(HG, get_repo_path(buildbotcustom),
-                                    protocol='ssh')
+        custom_pushRepo = make_hg_url(
+            hg_host, get_repo_path(buildbotcustom), protocol='ssh')
     else:
         custom_pushRepo = buildbotcustom
     if "://" in tools and not tools.startswith("file"):
-        tools_pushRepo = make_hg_url(HG, get_repo_path(tools),
-                                    protocol='ssh')
+        tools_pushRepo = make_hg_url(hg_host, get_repo_path(tools),
+                                     protocol='ssh')
     else:
         tools_pushRepo = tools
 
@@ -326,6 +372,10 @@ def main(options):
                          l10nContents=l10nContents, workdir=configs_workdir,
                          hg_username=hg_username,
                          productionBranch=buildbot_configs_branch)
+
+            # Send email to r-d for a fast notification
+            sendMailRD(smtp_server, notify_from, "%s/mozilla/%s" % (configs_workdir, cfgFile), release)
+
             rr.update_status(release, 'Running release sanity')
             rs_args = get_release_sanity_args(configs_workdir, release,
                                               cfgFile, masters_json,
@@ -379,7 +429,15 @@ def main(options):
     for release in rr.new_releases:
         try:
             rr.update_status(release, 'Running sendchange command')
-            rr.start_release_automation(release, sendchange_master)
+            staging = config.getboolean('release-runner', 'staging')
+            update(configs_workdir, revision='default')
+            cfgFile = path.join(configs_workdir,
+                                'mozilla',
+                                getReleaseConfigName(release['product'],
+                                                     path.basename(release['branch']),
+                                                     release['version'], staging))
+            enUSPlatforms = readReleaseConfig(cfgFile)['enUSPlatforms']
+            rr.start_release_automation(release, sendchange_master, enUSPlatforms)
         except:
             # We explicitly do not raise an error here because there's no
             # reason not to start other releases if the sendchange fails for

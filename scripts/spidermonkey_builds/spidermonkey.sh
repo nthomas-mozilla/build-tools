@@ -7,12 +7,13 @@ popd > /dev/null
 
 SPIDERDIR=$SCRIPTS_DIR/scripts/spidermonkey_builds
 
-if [ -z "$HG_REPO" ]; then
-    export HG_REPO="https://hg.mozilla.org/integration/mozilla-inbound"
-fi
+DEFAULT_REPO="https://hg.mozilla.org/integration/mozilla-inbound"
 
 function usage() {
-  echo "Usage: $0 [-m mirror_url] [-b bundle_url] [-r revision] variant"
+  echo "Usage: $0 [-m mirror_url] [-b bundle_url] [-r revision] [--dep] variant"
+  if [ -z "$PROPERTIES_FILE" ]; then
+    echo "PROPERTIES_FILE must be set for an automation build"
+  fi
 }
 
 # It doesn't work to just pull from try. If you try to pull the full repo,
@@ -20,7 +21,9 @@ function usage() {
 # revision, the pull is painfully slow (as in, it could take days) without
 # --bundle and/or --mirror.
 hgtool_args=()
-while [ $# -gt 1 ]; do
+noclean=""
+VARIANT=""
+while [ $# -gt 0 ]; do
     case "$1" in
         -m|--mirror)
             shift
@@ -32,24 +35,57 @@ while [ $# -gt 1 ]; do
             hgtool_args+=(--bundle "$1")
             shift
             ;;
+        --ttserver)
+            # Note that this script (and tooltool_wrapper.sh, and tooltool.py)
+            # only accepts a single tooltool server, so all but the last will
+            # be ignored.
+            shift
+            TT_SERVER="$1"
+            shift
+            ;;
         -r|--rev)
             shift
             hgtool_args+=(--clone-by-revision -r "$1")
             shift
             ;;
+        --dep)
+            shift
+            noclean=1
+            ;;
+        --platform)
+            shift
+            platform="$1"
+            shift
+            ;;
         *)
-            echo "Invalid arguments" >&2
-            usage
-            exit 1
+            if [ -z "$VARIANT" ]; then
+                VARIANT="$1"
+                shift
+            else
+                echo "Invalid arguments: multiple variants detected" >&2
+                usage
+                exit 1
+            fi
             ;;
     esac
 done
 
-VARIANT=$1
-if [ ! -f "$SPIDERDIR/$VARIANT" ]; then
-    echo "Could not find $VARIANT"
+if [ -z "$VARIANT" ]; then
     usage
     exit 1
+fi
+
+if [ -n "$PROPERTIES_FILE" ]; then
+    if ! [ -f "$PROPERTIES_FILE" ]; then
+        echo "Properties file '$PROPERTIES_FILE' not found, aborting" >&2
+        exit 1
+    fi
+    echo "Properties file found; running automation build"
+    export AUTOMATION=1
+    HG_REPO=${HG_REPO:-$DEFAULT_REPO}
+else
+    echo "Properties file not set; running development build"
+    unset AUTOMATION
 fi
 
 PYTHON="python"
@@ -65,7 +101,7 @@ if [ -f "$PROPERTIES_FILE" ]; then
 
     # Clobbering
     if [ -z "$CLOBBERER_URL" ]; then
-        export CLOBBERER_URL="http://clobberer.pvt.build.mozilla.org/index.php"
+        export CLOBBERER_URL="https://api.pub.build.mozilla.org/clobberer/lastclobber"
     fi
 
     cd $SCRIPTS_DIR/../..
@@ -75,15 +111,48 @@ if [ -f "$PROPERTIES_FILE" ]; then
 
     # Purging
     cd $SCRIPTS_DIR/..
-    $PYTHON $SCRIPTS_DIR/buildfarm/maintenance/purge_builds.py \
+    $PYTHON -u $SCRIPTS_DIR/buildfarm/maintenance/purge_builds.py \
         -s 4 -n info -n 'rel-*' -n 'tb-rel-*' -n $builddir
 fi
 
-if [ "$HG_REPO" = none ]; then
+if [ -z "$HG_REPO" ] || [ "$HG_REPO" = none ]; then
   SOURCE=.
 else
   $PYTHON $SCRIPTS_DIR/buildfarm/utils/hgtool.py "${hgtool_args[@]}" $HG_REPO src || exit 2
   SOURCE=src
+
+  # Pull down some standard tools that the build seems to have started
+  # requiring, eg mozmake on windows.
+  if [ "$OSTYPE" = "msys" ] && [ -n "$platform" ]; then
+      if [ -z "$TT_SERVER" ]; then
+          echo "Error: tooltool base url not set (use --ttserver command line option or TT_SERVER environment variable)" >&2
+          exit 1
+      fi
+      $SCRIPTS_DIR/scripts/tooltool/tooltool_wrapper.sh $SOURCE/browser/config/tooltool-manifests/${platform%-debug}/releng.manifest $TT_SERVER setup.sh 'c:\mozilla-build\python27\python.exe' C:/mozilla-build/tooltool.py
+  fi
+fi
+
+# The build script has been moved into the tree, but this script needs to keep
+# working for older branches.
+if [ -x "$SOURCE/js/src/devtools/automation/autospider.sh" ]; then
+    ARGS=""
+    if [ -n "$noclean" ]; then
+        ARGS="$ARGS --dep"
+    fi
+    if [ -n "$platform" ]; then
+        ARGS="$ARGV --platform $platform"
+    fi
+    exec $SOURCE/js/src/devtools/automation/autospider.sh $ARGS "$VARIANT"
+    exit 1
+fi
+
+# Everything from here down should be deleted when the oldest branch contains
+# the autospider.sh script.
+
+if [ ! -f "$SPIDERDIR/$VARIANT" ]; then
+    echo "Could not find $VARIANT"
+    usage
+    exit 1
 fi
 
 (cd $SOURCE/js/src; autoconf-2.13 || autoconf2.13)
@@ -96,8 +165,12 @@ else
 fi
 
 # Always do clobber builds. They're fast.
-[ -d objdir ] && rm -rf objdir
-mkdir objdir
+if [ -z "$noclean" ]; then
+  [ -d objdir ] && rm -rf objdir
+  mkdir objdir
+else
+  [ -d objdir ] || mkdir objdir
+fi
 cd objdir
 
 OBJDIR=$PWD
@@ -109,8 +182,10 @@ USE_64BIT=false
 if [[ "$OSTYPE" == darwin* ]]; then
   USE_64BIT=true
 elif [ "$OSTYPE" = "linux-gnu" ]; then
-  GCCDIR=/tools/gcc-4.7.2-0moz1
-  CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ccache"
+  if [ -n "$AUTOMATION" ]; then
+      GCCDIR="${GCCDIR:-/tools/gcc-4.7.2-0moz1}"
+      CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ccache"
+  fi
   UNAME_M=$(uname -m)
   MAKEFLAGS=-j4
   if [ "$VARIANT" = "arm-sim" ]; then
@@ -119,7 +194,7 @@ elif [ "$OSTYPE" = "linux-gnu" ]; then
     USE_64BIT=true
   fi
 
-  if [ "$UNAME_M" != "arm" ]; then
+  if [ "$UNAME_M" != "arm" ] && [ -n "$AUTOMATION" ]; then
     export CC=$GCCDIR/bin/gcc
     export CXX=$GCCDIR/bin/g++
     if $USE_64BIT; then
@@ -128,37 +203,27 @@ elif [ "$OSTYPE" = "linux-gnu" ]; then
       export LD_LIBRARY_PATH=$GCCDIR/lib
     fi
   fi
+elif [ "$OSTYPE" = "msys" ]; then
+  USE_64BIT=false
+  MAKE=${MAKE:-mozmake}
 fi
+
+MAKE=${MAKE:-make}
 
 if $USE_64BIT; then
   NSPR64="--enable-64bit"
 else
   NSPR64=""
-  export CC="$CC -m32"
-  export CXX="$CXX -m32"
-  export AR=ar
+  if [ "$OSTYPE" != "msys" ]; then
+    export CC="${CC:-/usr/bin/gcc} -m32"
+    export CXX="${CXX:-/usr/bin/g++} -m32"
+    export AR=ar
+  fi
 fi
 
-test -d nspr || mkdir nspr
-(cd nspr
-../../$SOURCE/nsprpub/configure --prefix=$OBJDIR/dist --with-dist-prefix=$OBJDIR/dist --with-mozilla $NSPR64
-make && make install
-) || exit 2
-
-test -d js || mkdir js
-
-cd js
-NSPR_CFLAGS=$($OBJDIR/dist/bin/nspr-config --cflags)
-if [ "$OSTYPE" = "msys" ]; then
-    NSPR_LIBS="$OBJDIR/dist/lib/plds4.lib $OBJDIR/dist/lib/plc4.lib $OBJDIR/dist/lib/nspr4.lib"
-    export PATH="$OBJDIR/dist/lib:${PATH}"
-else
-    NSPR_LIBS=$($OBJDIR/dist/bin/nspr-config --libs)
-fi
-../../$SOURCE/js/src/configure $CONFIGURE_ARGS --with-dist-dir=$OBJDIR/dist --prefix=$OBJDIR/dist --with-nspr-prefix=$OBJDIR/dist --with-nspr-cflags="$NSPR_CFLAGS" --with-nspr-libs="$NSPR_LIBS" || exit 2
-
-make -s -w -j4 || exit 2
-cp -p ../../$SOURCE/build/unix/run-mozilla.sh $OBJDIR/dist/bin
+../$SOURCE/js/src/configure $CONFIGURE_ARGS --enable-nspr-build --prefix=$OBJDIR/dist || exit 2
+$MAKE -s -w -j4 || exit 2
+cp -p ../$SOURCE/build/unix/run-mozilla.sh $OBJDIR/dist/bin
 
 # The Root Analysis tests run in a special GC Zeal mode and disable ASLR to
 # make tests reproducible.
@@ -171,6 +236,18 @@ if [[ "$VARIANT" = "rootanalysis" ]]; then
     if type setarch >/dev/null 2>&1; then
         COMMAND_PREFIX="setarch $(uname -m) -R "
     fi
+elif [[ "$VARIANT" = "generational" ]]; then
+    # Generational is currently being used for compacting GC
+    export JS_GC_ZEAL=14
+
+    # rootanalysis builds are currently only done on Linux, which should have
+    # setarch, but just in case we enable them on another platform:
+    if type setarch >/dev/null 2>&1; then
+        COMMAND_PREFIX="setarch $(uname -m) -R "
+    fi
 fi
-$COMMAND_PREFIX make check || exit 1
-$COMMAND_PREFIX make check-jit-test || exit 1
+
+$COMMAND_PREFIX $MAKE check || exit 1
+$COMMAND_PREFIX $MAKE check-jit-test || exit 1
+$COMMAND_PREFIX $MAKE check-jstests || exit 1
+$COMMAND_PREFIX $OBJDIR/dist/bin/jsapi-tests || exit 1

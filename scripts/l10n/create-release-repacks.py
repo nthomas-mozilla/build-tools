@@ -1,26 +1,28 @@
 #!/usr/bin/env python
 
-from collections import defaultdict
 import logging
 import os
 from os import path
 from traceback import format_exc, print_exc
 import site
 import sys
+from distutils.version import LooseVersion
 
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python"))
 site.addsitedir(path.join(path.dirname(__file__), "../../lib/python/vendor"))
 
-from balrog.submitter.cli import ReleaseSubmitter
+from balrog.submitter.cli import ReleaseSubmitterV3
 from build.checksums import parseChecksumsFile
 from build.l10n import repackLocale, l10nRepackPrep
+from build.paths import get_repo_dirname
 import build.misc
 from build.upload import postUploadCmdPrefix
 from release.download import downloadReleaseBuilds, downloadUpdateIgnore404
-from release.info import readReleaseConfig, readConfig
+from release.info import readReleaseConfig, readConfig, fileInfo
 from release.l10n import getReleaseLocalesForChunk
 from util.hg import mercurial, update, make_hg_url
 from util.retry import retry
+from release.info import getBuildID
 
 logging.basicConfig(
     stream=sys.stdout, level=logging.INFO, format="%(message)s")
@@ -42,14 +44,17 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
                   generatePartials=False, partialUpdates=None,
                   usePymake=False, tooltoolManifest=None,
                   tooltool_script=None, tooltool_urls=None,
-                  balrog_submitter=None, balrog_hash="sha512", buildid=None):
+                  balrog_submitter=None, balrog_hash="sha512",
+                  mozillaDir=None, mozillaSrcDir=None):
+    buildid = retry(getBuildID, args=(platform, product, version,
+                                      buildNumber, 'candidates', stageServer))
+    log.info('Got buildid: %s' % buildid)
     sourceRepoName = path.split(sourceRepo)[-1]
     absObjdir = path.abspath(path.join(sourceRepoName, objdir))
     localeSrcDir = path.join(absObjdir, appName, "locales")
     # Even on Windows we need to use "/" as a separator for this because
     # compare-locales doesn"t work any other way
     l10nIni = "/".join([sourceRepoName, appName, "locales", "l10n.ini"])
-
     env = {
         "MOZ_OBJDIR": objdir,
         "MOZ_MAKE_COMPLETE_MAR": "1",
@@ -87,9 +92,10 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
             " -n " + \
             path.join(os.getcwd(), "nonce").replace('\\', '\\\\\\\\') + \
             " -c " + \
-            path.join(os.getcwd(), "scripts", "release", "signing", "host.cert").replace('\\', '\\\\\\\\') + \
-            " -H " + \
-            os.environ['MOZ_SIGN_CMD'].split(' ')[-1]
+            path.join(os.getcwd(), "scripts", "release", "signing", "host.cert").replace('\\', '\\\\\\\\')
+        signingServers = os.environ["MOZ_SIGN_CMD"].split("-H", 1)[1].split("-H")
+        for s in signingServers:
+            env["MOZ_SIGN_CMD"] += " -H %s" % s.strip()
     build.misc.cleanupObjdir(sourceRepoName, objdir, appName)
     retry(mercurial, args=(sourceRepo, sourceRepoName))
     update(sourceRepoName, revision=revision)
@@ -121,17 +127,30 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
                                           absObjdir=absObjdir, merge=merge,
                                           productName=product, platform=platform,
                                           version=version, partialUpdates=partialUpdates,
-                                          buildNumber=buildNumber, stageServer=stageServer)
+                                          buildNumber=buildNumber, stageServer=stageServer,
+                                          mozillaDir=mozillaDir, mozillaSrcDir=mozillaSrcDir)
 
             if balrog_submitter:
                 # TODO: partials, after bug 797033 is fixed
                 checksums = parseChecksumsFile(open(checksums_file).read())
-                marInfo = defaultdict(dict)
+                completeInfo = []
+                partialInfo = []
                 for f, info in checksums.iteritems():
                     if f.endswith('.complete.mar'):
-                        marInfo['complete']['hash'] = info['hashes'][balrog_hash]
-                        marInfo['complete']['size'] = info['size']
-                if not marInfo['complete']:
+                        completeInfo.append({
+                            "size": info["size"],
+                            "hash": info["hashes"][balrog_hash],
+                        })
+                    if f.endswith('.partial.mar'):
+                        pathInfo = fileInfo(f, product.lower())
+                        previousVersion = pathInfo["previousVersion"]
+                        partialInfo.append({
+                            "previousVersion": previousVersion,
+                            "previousBuildNumber": partialUpdates[previousVersion]['buildNumber'],
+                            "size": info["size"],
+                            "hash": info["hashes"][balrog_hash],
+                        })
+                if not completeInfo:
                     raise Exception("Couldn't find complete mar info")
                 retry(balrog_submitter.run,
                     kwargs={
@@ -144,8 +163,8 @@ def createRepacks(sourceRepo, revision, l10nRepoDir, l10nBaseRepo,
                         'hashFunction': balrog_hash,
                         'extVersion': appVersion,
                         'buildID': buildid,
-                        'completeMarSize': marInfo['complete']['size'],
-                        'completeMarHash': marInfo['complete']['hash'],
+                        'completeInfo': completeInfo,
+                        'partialInfo': partialInfo,
                     }
                 )
         except Exception, e:
@@ -184,8 +203,6 @@ def validate(options, args):
     if options.balrog_api_root:
         if not options.credentials_file or not options.balrog_username:
             raise Exception("--credentials-file and --balrog-username must be set when --balrog-api-root is set.")
-        if not options.buildid:
-            raise Exception("--buildid must be set when --balrog-api-root is set")
 
     releaseConfig = readReleaseConfig(releaseConfigFile,
                                       required=REQUIRED_RELEASE_CONFIG)
@@ -242,7 +259,6 @@ if __name__ == "__main__":
     parser.add_option("--balrog-api-root", dest="balrog_api_root")
     parser.add_option("--credentials-file", dest="credentials_file")
     parser.add_option("--balrog-username", dest="balrog_username")
-    parser.add_option("--buildid", dest="buildid")
 
     options, args = parser.parse_args()
     retry(mercurial, args=(options.buildbotConfigs, "buildbot-configs"))
@@ -260,9 +276,9 @@ if __name__ == "__main__":
     platform = options.platform
     if platform == "linux":
         platform = "linux32"
-    mozconfig = path.join(sourceRepoInfo['name'], releaseConfig["appName"],
-                          "config", "mozconfigs", platform,
-                          "l10n-mozconfig")
+    mozconfig = path.join(get_repo_dirname(sourceRepoInfo["path"]),
+                          releaseConfig["appName"], "config", "mozconfigs",
+                          platform, "l10n-mozconfig")
 
     if options.chunks:
         locales = retry(getReleaseLocalesForChunk,
@@ -290,11 +306,17 @@ if __name__ == "__main__":
 
     stageSshKey = path.join("~", ".ssh", branchConfig["stage_ssh_key"])
 
+    mozillaDir = None
+    mozillaSrcDir = None
     # If mozilla_dir is defined, extend the paths in makeDirs with the prefix
     # of the mozilla_dir
     if 'mozilla_dir' in releaseConfig:
         for i in range(0, len(makeDirs)):
             makeDirs[i] = path.join(releaseConfig['mozilla_dir'], makeDirs[i])
+        mozillaDir = releaseConfig['mozilla_dir']
+        mozillaSrcDir = releaseConfig['mozilla_dir']
+    elif 'mozilla_srcdir' in releaseConfig:
+        mozillaSrcDir = releaseConfig['mozilla_srcdir']
 
     if not options.tooltool_script:
         options.tooltool_script = ['/tools/tooltool.py']
@@ -304,9 +326,21 @@ if __name__ == "__main__":
             required=['balrog_credentials']
         )
         auth = (options.balrog_username, credentials['balrog_credentials'][options.balrog_username])
-        balrog_submitter = ReleaseSubmitter(options.balrog_api_root, auth)
+        balrog_submitter = ReleaseSubmitterV3(options.balrog_api_root, auth)
     else:
         balrog_submitter = None
+
+    partialUpdates = releaseConfig.get('partialUpdates', {}).copy()
+    partialUpdates.update(releaseConfig.get('extraPartials', {}))
+    # FIXME: the follwong hack can be removed when win64 has the same list of
+    # partial update as other platforms. Check mozilla-esr38 to be sure.
+    if platform in releaseConfig.get('HACK_first_released_version', {}):
+        partialUpdates_copy = {}
+        for k, v in partialUpdates.iteritems():
+            if LooseVersion(k) >= LooseVersion(releaseConfig['HACK_first_released_version'][platform]):
+                partialUpdates_copy[k] = v
+        partialUpdates = partialUpdates_copy
+    # FIXME: end of hack
 
     createRepacks(
         sourceRepo=make_hg_url(branchConfig["hghost"], sourceRepoInfo["path"]),
@@ -334,11 +368,12 @@ if __name__ == "__main__":
         platform=options.platform,
         brand=brandName,
         generatePartials=options.generatePartials,
-        partialUpdates=releaseConfig["partialUpdates"],
+        partialUpdates=partialUpdates,
         usePymake=options.use_pymake,
         tooltoolManifest=options.tooltool_manifest,
         tooltool_script=options.tooltool_script,
         tooltool_urls=options.tooltool_urls,
         balrog_submitter=balrog_submitter,
-        buildid=options.buildid
+        mozillaDir=mozillaDir,
+        mozillaSrcDir=mozillaSrcDir
     )

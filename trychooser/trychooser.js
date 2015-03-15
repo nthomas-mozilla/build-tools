@@ -125,19 +125,17 @@ function setresult() {
             names = ['all'];
         } else {
             var group = $(this).closest('.option-group');
-            var options;
-            if (group.find('.subgroup-all-selector:checked').length > 0) {
-                // Special-case. We need to collapse things into a subgroup "all" value
-                options = group.find(':checked:not(.group-selector):not(.option-subgroup *)')
-                    .add('.subgroup-all-selector', group);
-            } else {
-                options = group.find(':checked:not(.group-selector):not(.subgroup-selector):not(.nondefault)');
-            }
+            var options = group.find(':checked:not(.group-selector):not(.subgroup-selector):not(.nondefault)');
+            group.find('.subgroup-all-selector:checked').each(function(i, elm) {
+                options = options.add($(elm));
+                var subgroup = $(this).closest('.option-subgroup');
+                options = options.not(subgroup.find(':checked:not(.group-selector):not(.subgroup-selector):not(.nondefault)'))
+            })
             options.each(function(i,elt){
-              names.push($(elt).attr('value'));
-              var project = $(elt).attr('data-project');
-              if (project)
-                have_projects[project] = true;
+                names.push($(elt).attr('value'));
+                var project = $(elt).attr('data-project');
+                if (project)
+                    have_projects[project] = true;
             });
         }
 
@@ -146,19 +144,13 @@ function setresult() {
             names.push($(elt).attr('value'));
         });
 
-        // If you specifically request a b2g or android build platform, then
-        // disable the filtering. This does not apply when you just pick 'all'.
-        var disable_filters = ("b2g" in have_projects) || ("android" in have_projects);
-        $('[try-filter=' + tryopt + ']').prop('disabled', disable_filters);
-        $('[try-filter=' + tryopt + ']').fadeTo(0, disable_filters ? 0.5 : 1.0);
-
         var filters = [];
         $('[try-filter=' + tryopt + '] :checked').each(function () {
-          filters.push.apply(filters, $(this).attr('value').split(','));
+            filters.push.apply(filters, $(this).attr('value').split(','));
         });
-        if (filters.length > 0 && !disable_filters) {
-          filters = resolveFilters(filters).join(',');
-          names = names.map(function (n) { return n + '[' + filters + ']'; });
+        if (filters.length > 0) {
+            filters = resolveFilters(filters).join(',');
+            names = names.map(function (n) { return n + '[' + filters + ']'; });
         }
 
         arg += names.join(',');
@@ -166,16 +158,28 @@ function setresult() {
     });
 
     if ($('.profile').is(':checked')) {
-      args.push('mozharness: --spsProfile');
+        args.push('mozharness: --spsProfile');
     }
 
     value = args.join(' ');
+    var incomplete = false;
+
+    if (value.match(/-b none/)) {
+        $('#build_type-none').addClass('attention')
+        incomplete = true;
+    } else {
+        $('#build_type-none').removeClass('attention')
+    }
 
     if (value.match(/-p none/)) {
-        value = "(NO JOBS CHOSEN)";
         $('#platforms-none').addClass('attention');
+        incomplete = true;
     } else {
         $('#platforms-none').removeClass('attention');
+    }
+
+    if (incomplete) {
+        value = "(NO JOBS CHOSEN)";
     }
 
     $('.result_value').val(value);

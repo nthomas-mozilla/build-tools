@@ -6,13 +6,16 @@ except ImportError:
 
 import os
 from os import path
-import site
 import logging
 import sys
 
-site.addsitedir(path.join(path.dirname(__file__), "../../lib/python"))
+# Use explicit version of python-requests
+sys.path.insert(0, path.join(path.dirname(__file__),
+                             "../../lib/python/vendor/requests-0.10.8"))
+sys.path.insert(0, path.join(path.dirname(__file__), "../../lib/python"))
 
-from balrog.submitter.cli import ReleaseCreator, ReleasePusher
+from balrog.submitter.cli import ReleaseCreatorV3, ReleaseCreatorV4, \
+    ReleasePusher
 from release.info import readReleaseConfig
 from util.retry import retry
 from util.hg import mercurial, make_hg_url
@@ -20,8 +23,9 @@ from util.hg import mercurial, make_hg_url
 HG = "hg.mozilla.org"
 DEFAULT_BUILDBOT_CONFIGS_REPO = make_hg_url(HG, 'build/buildbot-configs')
 REQUIRED_CONFIG = ('appVersion', 'productName', 'version', 'enUSPlatforms',
-    'testChannels', 'releaseChannel', 'baseTag', 'buildNumber',
-    'partialUpdates', 'stagingServer', 'bouncerServer', 'testChannelRuleIds')
+    'localTestChannel', 'cdnTestChannel', 'releaseChannel', 'baseTag',
+    'buildNumber', 'partialUpdates', 'stagingServer', 'bouncerServer',
+    'testChannelRuleIds')
 
 def validate(options):
     err = False
@@ -54,6 +58,8 @@ if __name__ == '__main__':
     parser.add_option("-r", "--release-config", dest="release_config")
     parser.add_option("-a", "--api-root", dest="api_root")
     parser.add_option("-c", "--credentials-file", dest="credentials_file")
+    parser.add_option("-s", "--schema", dest="schema_version",
+                      help="blob schema version", type="int", default=4)
     parser.add_option("-u", "--username", dest="username")
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true")
     options, args = parser.parse_args()
@@ -69,6 +75,9 @@ if __name__ == '__main__':
             print >>sys.stderr, "Required option %s not present" % opt
             sys.exit(1)
 
+    if options.schema_version not in (3,4):
+        parser.error("Only schema_versions 3 & 4 supported.")
+
     properties = json.load(open(options.build_properties))['properties']
     releaseTag = properties['script_repo_revision']
     hashType = properties['hashType']
@@ -78,15 +87,28 @@ if __name__ == '__main__':
     credentials = {}
     execfile(options.credentials_file, credentials)
     auth = (options.username, credentials['balrog_credentials'][options.username])
-    updateChannels = release_config['testChannels'] + [release_config['releaseChannel']]
+    updateChannels = [
+        release_config['localTestChannel'],
+        release_config['cdnTestChannel']
+    ]
+    if release_config['releaseChannel']:
+        updateChannels.append(release_config['releaseChannel'])
 
-    creator = ReleaseCreator(options.api_root, auth)
-    creator.run(release_config['appVersion'], release_config['productName'],
+    if options.schema_version == 3:
+        creator = ReleaseCreatorV3(options.api_root, auth)
+    else:
+        creator = ReleaseCreatorV4(options.api_root, auth)
+    # XXX: remove me later
+    partials = release_config['partialUpdates'].copy()
+    if release_config.get('extraPartials'):
+        partials.update(release_config['extraPartials'])
+    creator.run(release_config['appVersion'], release_config['productName'].capitalize(),
                 release_config['version'], release_config['buildNumber'],
-                release_config['partialUpdates'], updateChannels,
-                release_config['stagingServer'], release_config['bouncerServer'],
-                release_config['enUSPlatforms'], hashType)
+                updateChannels, release_config['stagingServer'],
+                release_config['bouncerServer'], release_config['enUSPlatforms'],
+                hashType, openURL=release_config.get('openURL'),
+                partialUpdates=partials)
 
     pusher = ReleasePusher(options.api_root, auth)
-    pusher.run(release_config['productName'], release_config['version'],
+    pusher.run(release_config['productName'].capitalize(), release_config['version'],
                release_config['buildNumber'], release_config['testChannelRuleIds'])

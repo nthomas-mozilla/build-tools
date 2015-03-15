@@ -27,73 +27,17 @@
     ],
     "repo_type": "hg"
   },
-  "mozilla-esr24": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-esr24",
+  "mozilla-esr31": {
+    "repo": "https://hg.mozilla.org/releases/mozilla-esr31",
     "graph_branches": [
-      "Mozilla-Esr24"
+      "Mozilla-Esr31"
     ],
     "repo_type": "hg"
   },
-  "comm-esr24": {
-    "repo": "https://hg.mozilla.org/releases/comm-esr24",
+  "comm-esr31": {
+    "repo": "https://hg.mozilla.org/releases/comm-esr31",
     "graph_branches": [
-      "Thunderbird-Esr24"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g18": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g18",
-    "graph_branches": [
-      "Mozilla-B2g18"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g18_v1_0_0": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_0_0",
-    "graph_branches": [
-      "Mozilla-B2g18_v1_0_0"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g18_v1_0_1": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_0_1",
-    "graph_branches": [
-      "Mozilla-B2g18_v1_0_1"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g18_v1_1_0_hd": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g18_v1_1_0_hd",
-    "graph_branches": [
-      "Mozilla-B2g18-v1.1.0hd"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g26_v1_2": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g26_v1_2",
-    "graph_branches": [
-      "Mozilla-B2g26-v1.2"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g26_v1_2f": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g26_v1_2f",
-    "graph_branches": [
-      "Mozilla-B2g26-v1.2f"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g28_v1_3": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g28_v1_3",
-    "graph_branches": [
-      "Mozilla-B2g28-v1.3"
-    ],
-    "repo_type": "hg"
-  },
-  "mozilla-b2g28_v1_3t": {
-    "repo": "https://hg.mozilla.org/releases/mozilla-b2g28_v1_3t",
-    "graph_branches": [
-      "Mozilla-B2g28-v1.3t"
+      "Thunderbird-Esr31"
     ],
     "repo_type": "hg"
   },
@@ -101,6 +45,34 @@
     "repo": "https://hg.mozilla.org/releases/mozilla-b2g30_v1_4",
     "graph_branches": [
       "Mozilla-B2g30-v1.4"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g32_v2_0": {
+    "repo": "https://hg.mozilla.org/releases/mozilla-b2g32_v2_0",
+    "graph_branches": [
+      "Mozilla-B2g32-v2.0"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g34_v2_1": {
+    "repo": "https://hg.mozilla.org/releases/mozilla-b2g34_v2_1",
+    "graph_branches": [
+      "Mozilla-B2g34-v2.1"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g34_v2_1s": {
+    "repo": "https://hg.mozilla.org/releases/mozilla-b2g34_v2_1s",
+    "graph_branches": [
+      "Mozilla-B2g34-v2.1s"
+    ],
+    "repo_type": "hg"
+  },
+  "mozilla-b2g37_v2_2": {
+    "repo": "https://hg.mozilla.org/releases/mozilla-b2g37_v2_2",
+    "graph_branches": [
+      "Mozilla-B2g37-v2.2"
     ],
     "repo_type": "hg"
   },
@@ -301,13 +273,6 @@
     "repo": "https://hg.mozilla.org/projects/jamun",
     "graph_branches": [
       "Jamun"
-    ],
-    "repo_type": "hg"
-  },
-  "graphics": {
-    "repo": "https://hg.mozilla.org/projects/graphics",
-    "graph_branches": [
-      "Graphics"
     ],
     "repo_type": "hg"
   }
