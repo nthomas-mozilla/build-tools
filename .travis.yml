@@ -2,6 +2,22 @@ language: python
 python:
   - "2.7"
 
+sudo: false
+
+env:
+  global:
+    - PIP_FIND_LINKS=file://$HOME/.cache/pip
+    - PIP_CACHE_DIR=$HOME/.cache/pip
+  matrix:
+    - TOX_ENV=py27-hg2.6
+    - TOX_ENV=py26-hg2.6
+    - TOX_ENV=py27-hg3.2
+
+cache:
+  directories:
+    - $HOME/.cache/pip
+    - $TRAVIS_BUILD_DIR/.tox
+
 before_script:
   - git config --global user.email "travis@travis-ci.org"
   - git config --global user.name "Travis McTravis"
@@ -11,7 +27,9 @@ install:
   - pip install tox
 
 script:
-  - tox
+  - tox -e $TOX_ENV
+  # Remove logs to avoid cache uploads
+  - rm -rf $HOME/.cache/pip/log
 
 after_script:
   - tox -e py27-coveralls
@@ -26,7 +44,7 @@ notifications:
     on_success: always
     on_failure: always
     template:
-      - "%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message}"
-      - "Change view : %{compare_url}"
-      - "Build details : %{build_url}"
-      - "Commit message : %{commit_message}"
+      - "\x02%{repository}\x0314#%{build_number}\x03\x02 (%{branch} - %{commit} : %{author}): \x02\x0312%{message}\x02\x03"
+      - "\x02Change view\x02 : \x0314%{compare_url}\x03"
+      - "\x02Build details\x02 : \x0314%{build_url}\x03"
+      - "\x02Commit message\x02 : \x0314%{commit_message}\x03"

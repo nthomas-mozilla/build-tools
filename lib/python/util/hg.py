@@ -2,6 +2,7 @@
 import os
 import re
 import subprocess
+import time
 import sys
 from urlparse import urlsplit
 from ConfigParser import RawConfigParser
@@ -19,7 +20,18 @@ TRANSIENT_HG_ERRORS = (
     TERMINATED_PROCESS_MSG,
 )
 
+# Error strings that we want to retry on, but with a longer sleep
+TRANSIENT_HG_ERRORS_EXTRA_WAIT = (
+    'HTTP Error 503'
+)
+
+# Multiply wait times by this value for the "extra wait" errors
+RETRY_EXTRA_WAIT_SCALE = 5
+
 RETRY_ATTEMPTS = 3
+RETRY_SLEEPTIME = 15
+RETRY_SLEEPSCALE = 2
+RETRY_JITTER = 10
 
 
 class DefaultShareBase:
@@ -109,6 +121,24 @@ def is_hg_cset(rev):
         int(rev, 16)
         return True
     except (TypeError, ValueError):
+        return False
+
+
+def has_rev(repo, rev):
+    """Returns True if the repository has the specified revision.
+
+    Arguments:
+        repo (str):     path to repository
+        rev  (str):     revision identifier
+    """
+    log.info("checking to see if %s exists in %s", rev, repo)
+    cmd = ['log', '-r', rev, '--template', '{node}']
+    try:
+        get_hg_output(cmd, cwd=repo, include_stderr=True)
+        log.info("%s exists in %s", rev, repo)
+        return True
+    except subprocess.CalledProcessError:
+        log.info("%s does not exist in %s", rev, repo)
         return False
 
 
@@ -250,12 +280,19 @@ def clone(repo, dest, branch=None, revision=None, update_dest=True,
 
     cmd.extend([repo, dest])
     exc = None
-    for _ in retrier(attempts=RETRY_ATTEMPTS):
+    for _ in retrier(attempts=RETRY_ATTEMPTS, sleeptime=RETRY_SLEEPTIME,
+                     sleepscale=RETRY_SLEEPSCALE, jitter=RETRY_JITTER):
         try:
             get_hg_output(cmd=cmd, include_stderr=True, timeout=timeout)
             break
         except subprocess.CalledProcessError, e:
             exc = sys.exc_info()
+
+            if any(s in e.output for s in TRANSIENT_HG_ERRORS_EXTRA_WAIT):
+                sleeptime = _ * RETRY_EXTRA_WAIT_SCALE
+                log.debug("Encountered an HG error which requires extra sleep, sleeping for %.2fs", sleeptime)
+                time.sleep(sleeptime)
+
             if any(s in e.output for s in TRANSIENT_HG_ERRORS):
                 # This is ok, try again!
                 # Make sure the dest is clean
@@ -325,12 +362,19 @@ def pull(repo, dest, update_dest=True, mirrors=None, **kwargs):
 
     cmd.append(repo)
     exc = None
-    for _ in retrier(attempts=RETRY_ATTEMPTS):
+    for _ in retrier(attempts=RETRY_ATTEMPTS, sleeptime=RETRY_SLEEPTIME,
+                     sleepscale=RETRY_SLEEPSCALE, jitter=RETRY_JITTER):
         try:
             get_hg_output(cmd=cmd, cwd=dest, include_stderr=True)
             break
         except subprocess.CalledProcessError, e:
             exc = sys.exc_info()
+
+            if any(s in e.output for s in TRANSIENT_HG_ERRORS_EXTRA_WAIT):
+                sleeptime = _ * RETRY_EXTRA_WAIT_SCALE
+                log.debug("Encountered an HG error which requires extra sleep, sleeping for %.2fs", sleeptime)
+                time.sleep(sleeptime)
+
             if any(s in e.output for s in TRANSIENT_HG_ERRORS):
                 # This is ok, try again!
                 continue
@@ -459,6 +503,11 @@ def mercurial(repo, dest, branch=None, revision=None, update_dest=True,
             try:
                 if autoPurge:
                     purge(dest)
+                if revision is not None and is_hg_cset(revision) and has_rev(dest, revision):
+                    log.info("skipping pull since we already have %s", revision)
+                    if update_dest:
+                        return update(dest, branch=branch, revision=revision)
+                    return revision
                 return pull(repo, dest, update_dest=update_dest, branch=branch,
                             revision=revision,
                             mirrors=mirrors)
