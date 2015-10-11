@@ -10,6 +10,7 @@ import shutil
 import time
 import subprocess
 import inspect
+from getpass import getpass
 
 try:
     import simplejson as json
@@ -24,6 +25,7 @@ from util.retry import retry
 OK = green('[OK]')
 FAIL = red('[FAIL]')
 SLAVEALLOC = "https://secure.pub.build.mozilla.org/slavealloc/api"
+auth = None
 
 RECONFIG_LOCKFILE = 'reconfig.lock'
 
@@ -289,24 +291,36 @@ def action_update_exception_timestamp(master):
         run('date +%s > /home/cltbld/.{0}-last-time.txt'.format(master['name']))
 
 
+def get_ldap_auth():
+    global auth
+    if auth:
+        return auth
+    else:
+        username = raw_input("LDAP username: ")
+        password = getpass("LDAP password: ")
+        auth = (username, password)
+        return auth
+
+
 def action_enable_master(master):
-    # Get the master id
-    # Returns the previous enabled status
-    master = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name']).json()
+    r = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name'], auth=get_ldap_auth())
+    r.raise_for_status()
+    master = r.json()
     master_id = master['masterid']
-    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': True}))
+    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': True}),
+                     auth=get_ldap_auth())
     r.raise_for_status()
     return master['enabled']
 
 
 def action_disable_master(master):
-    # Get the master id
-    # Returns the previous enabled status
-    master = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name']).json()
+    r = requests.get(SLAVEALLOC + "/masters/%s?byname=1" % master['name'], auth=get_ldap_auth())
+    r.raise_for_status()
+    master = r.json()
     if 'masterid' not in master:
         return False
     master_id = master['masterid']
-    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': False}))
+    r = requests.put(SLAVEALLOC + "/masters/%s" % master_id, data=json.dumps({'enabled': False}), auth=get_ldap_auth())
     r.raise_for_status()
     return master['enabled']
 
