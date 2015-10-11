@@ -30,6 +30,7 @@ EXIT CODES for `basename $0`:
    11    Unknown command-line option provided
    12    Branch not specified on command-line
    13    No update action specified on command-line
+   14    Invalid product specified
    21    Unable to parse version from version.txt
    31    Missing downloaded browser artifact
    32    Missing downloaded tests artifact
@@ -39,6 +40,8 @@ EXIT CODES for `basename $0`:
    52    Generated HPKP preload list is empty
    61    Downloaded AMO blocklist file isn't valid XML
    62    Downloaded hg blocklist file isn't valid XML
+   70    HSTS script failed
+   71    HPKP script failed
 
 EOF
 }
@@ -59,9 +62,9 @@ REPODIR=''
 HGTOOL="$(dirname "${0}")/../../buildfarm/utils/hgtool.py"
 MIRROR=''
 BUNDLE=''
-APP_DIR="browser"
-APP_ID="%7Bec8030f7-c20a-464f-9b0e-13a3a9e97384%7D"
-APP_NAME="Firefox"
+APP_DIR=''
+APP_ID=''
+APP_NAME=''
 LOCALHOST=`/bin/hostname -s`
 HGHOST="hg.mozilla.org"
 STAGEHOST="stage.mozilla.org"
@@ -70,9 +73,11 @@ WGET="wget -nv"
 UNZIP="unzip -q"
 DIFF="diff -up"
 BASEDIR=`pwd`
+SCRIPTDIR=`dirname $0`
 VERSION=''
 MCVERSION=''
 USE_MC=false
+FLATTENED=true
 
 DO_HSTS=false
 HSTS_PRELOAD_SCRIPT="getHSTSPreloadList.js"
@@ -160,14 +165,37 @@ function download_shared_artifacts {
     cp tests/bin/xpcshell "${PRODUCT}"
 }
 
+# gtk3 is required to run xpcshell as of Gecko 42.
+function download_gtk3 {
+    sh ${SCRIPTDIR}/../tooltool/tooltool_wrapper.sh ${SCRIPTDIR}/periodic_file_updates.manifest https://api.pub.build.mozilla.org/tooltool/ setup.sh /builds/tooltool.py --authentication-file /builds/relengapi.tok
+    LD_LIBRARY_PATH=${BASEDIR}/gtk3/usr/local/lib
+}
+
+# In bug 1164714, the public/src subdirectories were flattened away under security/manager.
+# We need to check whether the HGREPO were processing has had that change uplifted yet so
+# that we can find the files we need to update.
+function is_flattened {
+    # This URL will only be present in repos that have *not* been flattened.
+    TEST_URL="${HGREPO}/raw-file/default/security/manager/boot/src/"
+    HTTP_STATUS=`${WGET} --spider -S ${TEST_URL} 2>&1 | grep "HTTP/" | awk '{print $2}'`
+    if [ "$HTTP_STATUS" == "200" ]; then
+        export FLATTENED=false
+    fi
+}
+
 # Downloads the current in-tree HSTS (HTTP Strict Transport Security) files.
 # Runs a simple xpcshell script to generate up-to-date HSTS information.
 # Compares the new HSTS output with the old to determine whether we need to update.
 function compare_hsts_files {
     cd "${BASEDIR}"
     HSTS_PRELOAD_SCRIPT_HG="${HGREPO}/raw-file/default/security/manager/tools/${HSTS_PRELOAD_SCRIPT}"
-    HSTS_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HSTS_PRELOAD_ERRORS}"
-    HSTS_PRELOAD_INC_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HSTS_PRELOAD_INC}"
+    if [ "${FLATTENED}" == "true" ]; then
+        HSTS_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/ssl/${HSTS_PRELOAD_ERRORS}"
+        HSTS_PRELOAD_INC_HG="${HGREPO}/raw-file/default/security/manager/ssl/${HSTS_PRELOAD_INC}"
+    else
+        HSTS_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HSTS_PRELOAD_ERRORS}"
+        HSTS_PRELOAD_INC_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HSTS_PRELOAD_INC}"
+    fi
 
     # Download everything we need: browser, tests, updater script, existing preload list and errors.
     echo "INFO: Downloading all the necessary pieces to update HSTS..."
@@ -189,8 +217,14 @@ function compare_hsts_files {
     # Run the script to get an updated preload list.
     echo "INFO: Generating new HSTS preload list..."
     cd "${BASEDIR}/${PRODUCT}"
-    echo INFO: Running \"LD_LIBRARY_PATH=. ./xpcshell ${BASEDIR}/${HSTS_PRELOAD_SCRIPT} ${BASEDIR}/${PRHSTS_ELOAD_INC}\"
-    LD_LIBRARY_PATH=. ./xpcshell "${BASEDIR}/${HSTS_PRELOAD_SCRIPT}" "${BASEDIR}/${HSTS_PRELOAD_INC}"
+    echo INFO: Running \"LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:. ./xpcshell ${BASEDIR}/${HSTS_PRELOAD_SCRIPT} ${BASEDIR}/${HSTS_PRELOAD_INC}\"
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:. ./xpcshell "${BASEDIR}/${HSTS_PRELOAD_SCRIPT}" "${BASEDIR}/${HSTS_PRELOAD_INC}"
+    XPCSHELL_STATUS=$?
+    if [ ${XPCSHELL_STATUS} != 0 ]; then
+        cat ${HSTS_PRELOAD_ERRORS}
+        echo "ERROR: xpcshell exited with a non-zero exit code: ${XPCSHELL_STATUS}" >&2
+        exit 70
+    fi
 
     # The created files should be non-empty.
     echo "INFO: Checking whether new HSTS preload list is valid..."
@@ -235,8 +269,13 @@ function compare_hpkp_files {
     HPKP_PRELOAD_SCRIPT_HG="${HGREPO}/raw-file/default/security/manager/tools/${HPKP_PRELOAD_SCRIPT}"
     HPKP_PRELOAD_JSON_HG="${HGREPO}/raw-file/default/security/manager/tools/${HPKP_PRELOAD_JSON}"
     HPKP_DER_TEST_HG="${HGREPO}/raw-file/default/security/manager/ssl/tests/unit/tlsserver/${HPKP_DER_TEST}"
-    HPKP_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HPKP_PRELOAD_ERRORS}"
-    HPKP_PRELOAD_OUTPUT_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HPKP_PRELOAD_OUTPUT}"
+    if [ "${FLATTENED}" == "true" ]; then
+        HPKP_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/ssl/${HPKP_PRELOAD_ERRORS}"
+        HPKP_PRELOAD_OUTPUT_HG="${HGREPO}/raw-file/default/security/manager/ssl/${HPKP_PRELOAD_OUTPUT}"
+    else
+        HPKP_PRELOAD_ERRORS_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HPKP_PRELOAD_ERRORS}"
+        HPKP_PRELOAD_OUTPUT_HG="${HGREPO}/raw-file/default/security/manager/boot/src/${HPKP_PRELOAD_OUTPUT}"
+    fi
 
     # Download everything we need: browser, tests, updater script, existing preload list and errors.
     echo "INFO: Downloading all the necessary pieces to update HPKP..."
@@ -258,7 +297,15 @@ function compare_hpkp_files {
     # Run the script to get an updated preload list.
     echo "INFO: Generating new HPKP preload list..."
     cd "${BASEDIR}/${PRODUCT}"
-    LD_LIBRARY_PATH=. ./xpcshell "${BASEDIR}/${HPKP_PRELOAD_SCRIPT}" "${BASEDIR}/${HPKP_PRELOAD_JSON}" "${BASEDIR}/${HPKP_DER_TEST}" "${BASEDIR}/${PRODUCT}/${HPKP_PRELOAD_OUTPUT}" > "${HPKP_PRELOAD_ERRORS}" 2>&1
+    echo INFO: Running \"LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:. ./xpcshell ${BASEDIR}/${HPKP_PRELOAD_SCRIPT} ${BASEDIR}/${HPKP_PRELOAD_JSON} ${BASEDIR}/${HPKP_DER_TEST} ${BASEDIR}/${PRODUCT}/${HPKP_PRELOAD_OUTPUT}\"
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:. ./xpcshell "${BASEDIR}/${HPKP_PRELOAD_SCRIPT}" "${BASEDIR}/${HPKP_PRELOAD_JSON}" "${BASEDIR}/${HPKP_DER_TEST}" "${BASEDIR}/${PRODUCT}/${HPKP_PRELOAD_OUTPUT}" > "${HPKP_PRELOAD_ERRORS}" 2>&1
+    XPCSHELL_STATUS=$?
+    if [ ${XPCSHELL_STATUS} != 0 ]; then
+        cat ${HPKP_PRELOAD_ERRORS}
+        echo "ERROR: xpcshell exited with a non-zero exit code: ${XPCSHELL_STATUS}" >&2
+        exit 71
+    fi
+
     # The created files should be non-empty.
     echo "INFO: Checking whether new HPKP preload list is valid..."
     if [ ! -s "${HPKP_PRELOAD_ERRORS}" ]; then
@@ -395,8 +442,13 @@ function clone_repo {
 # Copies new HSTS files in place, and commits them.
 function commit_hsts_files {
     cd "${BASEDIR}"
-    cp -f ${PRODUCT}/${HSTS_PRELOAD_ERRORS} ${REPODIR}/security/manager/boot/src/
-    cp -f ${PRODUCT}/${HSTS_PRELOAD_INC} ${REPODIR}/security/manager/boot/src/
+    if [ "${FLATTENED}" == "true" ]; then
+        cp -f ${PRODUCT}/${HSTS_PRELOAD_ERRORS} ${REPODIR}/security/manager/ssl/
+        cp -f ${PRODUCT}/${HSTS_PRELOAD_INC} ${REPODIR}/security/manager/ssl/
+    else
+        cp -f ${PRODUCT}/${HSTS_PRELOAD_ERRORS} ${REPODIR}/security/manager/boot/src/
+	cp -f ${PRODUCT}/${HSTS_PRELOAD_INC} ${REPODIR}/security/manager/boot/src/
+    fi
     COMMIT_MESSAGE="No bug, Automated HSTS preload list update from host ${LOCALHOST}"
     if [ ${DONTBUILD} == true ]; then
         COMMIT_MESSAGE="${COMMIT_MESSAGE} - (DONTBUILD)"
@@ -419,8 +471,13 @@ function commit_hsts_files {
 # Copies new HPKP files in place, and commits them.
 function commit_hpkp_files {
     cd "${BASEDIR}"
-    cp -f ${PRODUCT}/${HPKP_PRELOAD_ERRORS} ${REPODIR}/security/manager/boot/src/
-    cp -f ${PRODUCT}/${HPKP_PRELOAD_OUTPUT} ${REPODIR}/security/manager/boot/src/
+    if [ "${FLATTENED}" == "true" ]; then
+        cp -f ${PRODUCT}/${HPKP_PRELOAD_ERRORS} ${REPODIR}/security/manager/ssl/
+        cp -f ${PRODUCT}/${HPKP_PRELOAD_OUTPUT} ${REPODIR}/security/manager/ssl/
+    else
+        cp -f ${PRODUCT}/${HPKP_PRELOAD_ERRORS} ${REPODIR}/security/manager/boot/src/
+        cp -f ${PRODUCT}/${HPKP_PRELOAD_OUTPUT} ${REPODIR}/security/manager/boot/src/
+    fi
     COMMIT_MESSAGE="No bug, Automated HPKP preload list update from host ${LOCALHOST}"
     if [ ${DONTBUILD} == true ]; then
         COMMIT_MESSAGE="${COMMIT_MESSAGE} - (DONTBUILD)"
@@ -529,6 +586,25 @@ if [ "$DO_HSTS" == "false" -a "$DO_HPKP" == "false" -a "$DO_BLOCKLIST" == "false
     exit 13
 fi
 
+# per-product constants
+case "${PRODUCT}" in
+    thunderbird)
+        APP_DIR="mail"
+        APP_ID="%7B3550f703-e582-4d05-9a08-453d09bdfdc6%7D"
+        APP_NAME="Thunderbird"
+        ;;
+    firefox)
+        APP_DIR="browser"
+        APP_ID="%7Bec8030f7-c20a-464f-9b0e-13a3a9e97384%7D"
+        APP_NAME="Firefox"
+        ;;
+    *)
+        echo "Error: Invalid product specified"
+        usage
+        exit 14
+        ;;
+esac
+
 if [ "${REPODIR}" == "" ]; then
    REPODIR=`basename ${BRANCH}`
 fi
@@ -545,10 +621,10 @@ if [ "${USE_MC}" == "true" ]; then
 fi
 
 BROWSER_ARCHIVE="${PRODUCT}-${VERSION}.en-US.${PLATFORM}.${PLATFORM_EXT}"
-TESTS_ARCHIVE="${PRODUCT}-${VERSION}.en-US.${PLATFORM}.tests.zip"
+TESTS_ARCHIVE="${PRODUCT}-${VERSION}.en-US.${PLATFORM}.common.tests.zip"
 if [ "${USE_MC}" == "true" ]; then
     BROWSER_ARCHIVE="${PRODUCT}-${MCVERSION}.en-US.${PLATFORM}.${PLATFORM_EXT}"
-    TESTS_ARCHIVE="${PRODUCT}-${MCVERSION}.en-US.${PLATFORM}.tests.zip"
+    TESTS_ARCHIVE="${PRODUCT}-${MCVERSION}.en-US.${PLATFORM}.common.tests.zip"
 fi
 
 # Try to find hgtool if it hasn't been set.
@@ -557,7 +633,11 @@ if [ ! -f "${HGTOOL}" ]; then
 fi
 
 preflight_cleanup
-download_shared_artifacts
+if [ "${DO_HSTS}" == "true" -o "${DO_HPKP}" == "true" ]; then
+    download_shared_artifacts
+    download_gtk3
+fi
+is_flattened
 if [ "${DO_HSTS}" == "true" ]; then
     compare_hsts_files
     if [ $? != 0 ]; then
@@ -582,7 +662,7 @@ if [ "${HSTS_UPDATED}" == "false" -a "${HPKP_UPDATED}" == "false" -a "${BLOCKLIS
     exit 0
 else
     if [ "${DRY_RUN}" == "true" ]; then
-        echo "INFO: Updates are available, bot updating hg in dry-run mode."
+        echo "INFO: Updates are available, not updating hg in dry-run mode."
         exit 2
     fi
 fi

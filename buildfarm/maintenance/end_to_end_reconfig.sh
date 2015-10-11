@@ -15,6 +15,14 @@
 #
 #############################################
 
+# Include our shared function library
+if [ -e ../../lib/shell/functions ]; then
+    . ../../lib/shell/functions
+else
+    echo "Shared functions missing: ../../lib/shell/functions" >&2
+    exit 1
+fi
+
 START_TIME="$(date +%s)"
 
 # Explicitly unset any pre-existing environment variables to avoid variable collision
@@ -57,7 +65,8 @@ function usage {
     echo
     echo "EXIT CODES"
     echo "     0        Success"
-    echo "     1        Bad command line options specified"
+    echo "     1        Error loading shared functions"
+    echo "     2        Bad command line options specified"
     echo "    64        Could not create directory to store results (RECONFIG_DIR)"
     echo "    65        Wiki credentials file not found"
     echo "    66        Python 2.7 not found in PATH"
@@ -128,26 +137,6 @@ function hg_wrapper {
     return "${HG_RETURN_CODE}"
 }
 
-function show_time () {
-    num=$1
-    min=0
-    hour=0
-    day=0
-    if ((num>59)); then
-        ((sec=num%60))
-        ((num=num/60))
-        if ((num>59)); then
-            ((min=num%60))
-            ((hour=num/60))
-        else
-            ((min=num))
-        fi
-    else
-	((sec=num))
-    fi
-    echo "$hour"h "$min"m "$sec"s
-}
-
 set +u
 command_called "${@}" | sed '1s/^/  * /;2s/^/    /'
 set -u
@@ -176,7 +165,7 @@ while getopts ":bfhmnpr:w:" opt; do
         w)  RECONFIG_CREDENTIALS_FILE="${OPTARG}"
             ;;
         ?)  usage >&2
-            exit 1
+            exit 2
             ;;
     esac
 done
@@ -395,7 +384,11 @@ echo "  * All preflight checks passed in '$(basename "${0}")'"
 
 if [ "${PREPARE_ONLY}" == '0' ]; then
     # Failing to update IRC is non-fatal.
-    ./update_irc.sh "Reconfig has started" || true
+    IRC_MSG="Merge to production has started for buildbot repos."
+    if [ "${FORCE_RECONFIG}" == '1' ]; then
+        IRC_MSG="Reconfig has started."
+    fi
+    ./update_irc.sh "${IRC_MSG}" || true
 fi
 
 # Merges mozharness, buildbot-configs from default -> production.
@@ -404,6 +397,11 @@ fi
 function merge_to_production {
     [ "${MERGE_TO_PRODUCTION}" == 0 ] && return 0
     echo "  * hg log for this session: '${RECONFIG_DIR}/hg-${START_TIME}.log'"
+    # Create an empty merge file to compare against so we don't claim merge success when nothing was merged.
+    {
+        echo "Merging from default"
+        echo
+    } > "${RECONFIG_DIR}/empty_merge"
     for repo in mozharness buildbot-configs buildbotcustom; do
         if [ -d "${RECONFIG_DIR}/${repo}" ]; then
             echo "  * Existing hg clone of ${repo} found: '${RECONFIG_DIR}/${repo}' - pulling for updates..."
@@ -436,7 +434,7 @@ function merge_to_production {
             echo "       push to ${branch} branch, and run this script again." >&2
             exit 69
         else
-            echo "  * Merge resulted in change"
+            echo "  * ${repo} merge resulted in change"
         fi
         # Still commit and push, even if no new changes, since a merge conflict might have been resolved
         hg_wrapper commit -l "${RECONFIG_DIR}/${repo}_preview_changes.txt"
@@ -444,7 +442,9 @@ function merge_to_production {
             echo "  * Pushing '${RECONFIG_DIR}/${repo}' ${branch} branch to ssh://hg.mozilla.org/build/${repo}..."
             hg_wrapper push
         fi
-        echo "${repo}" >> "${RECONFIG_DIR}/pending_changes"
+        if ! diff "${RECONFIG_DIR}/empty_merge" "${RECONFIG_DIR}/${repo}_preview_changes.txt" > /dev/null; then
+  	    echo "${repo}" >> "${RECONFIG_DIR}/pending_changes"
+        fi
     done
     [ -f "${RECONFIG_DIR}/pending_changes" ] && return 0 || return 1
 }
@@ -474,7 +474,11 @@ if [ "${#commit_processing_options[@]}" -gt 0 ]; then
 fi
 
 # Return code of merge_to_production is 0 if merge performed successfully and changes made
-if merge_to_production || [ "${FORCE_RECONFIG}" == '1' ]; then
+if merge_to_production; then
+    echo "  * All changes merged to production."
+fi
+
+if [ "${FORCE_RECONFIG}" == '1' ]; then
     production_masters_url='http://hg.mozilla.org/build/tools/raw-file/tip/buildfarm/maintenance/production-masters.json'
     if [ "${PREPARE_ONLY}" != '0' ]; then
         echo "  * Preparing reconfig only; not running: '$(pwd)/manage_masters.py' -f '${production_masters_url}' -j16 -R scheduler -R build -R try -R tests show_revisions update"
@@ -519,8 +523,12 @@ if [ -f "${RECONFIG_DIR}/${RECONFIG_UPDATE_FILE}" ]; then
             RECONFIG_STOP_TIME="$(date +%s)"
             RECONFIG_ELAPSED=$((RECONFIG_STOP_TIME - START_TIME))
             RECONFIG_ELAPSED_DISPLAY=`show_time ${RECONFIG_ELAPSED}`
-	    # Failing to update IRC is non-fatal.
-            ./update_irc.sh "Reconfig has finished in ${RECONFIG_ELAPSED_DISPLAY}. See http://bit.ly/reconfigs for details." || true
+            IRC_MSG="Merge has finished in ${RECONFIG_ELAPSED_DISPLAY}. See http://bit.ly/reconfigs for details. Masters will reconfig themselves automatically on the hour."
+            if [ "${FORCE_RECONFIG}" == '1' ]; then
+                IRC_MSG="Reconfig has finished in ${RECONFIG_ELAPSED_DISPLAY}. See http://bit.ly/reconfigs for details."
+            fi
+            # Failing to update IRC is non-fatal.
+            ./update_irc.sh "${IRC_MSG}" || true
         fi
     fi
 

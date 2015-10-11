@@ -40,7 +40,7 @@ def is_authenticode_signed(filename):
 
 
 def main():
-    allowed_formats = ("signcode", "osslsigncode", "gpg", "mar", "dmg",
+    allowed_formats = ("sha2signcode", "signcode", "osslsigncode", "gpg", "mar", "dmg",
                        "dmgv2", "jar", "b2gmar", "emevoucher")
 
     from optparse import OptionParser
@@ -130,6 +130,13 @@ def main():
         else:
             formats.append(fmt)
 
+    # bug 1164456
+    # GPG signing must happen last because it will be invalid if done prior to
+    # any format that modifies the file in-place.
+    if "gpg" in formats:
+        formats.remove("gpg")
+        formats.append("gpg")
+
     if options.output_file and (len(args) > 1 or os.path.isdir(args[0])):
         parser.error(
             "-o / --output-file can only be used when signing a single file")
@@ -198,7 +205,7 @@ def main():
         for f in files:
             log.debug("%s", f)
             log.debug("checking %s for signature...", f)
-            if fmt in ('signcode', 'osslsigncode') and is_authenticode_signed(f):
+            if fmt in ('sha2signcode', 'signcode', 'osslsigncode') and is_authenticode_signed(f):
                 log.info("Skipping %s because it looks like it's already signed", f)
                 continue
             if options.output_dir:

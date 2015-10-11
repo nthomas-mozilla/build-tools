@@ -43,6 +43,14 @@ NOTIFY_TO=$(grep "notify_to:" $CONFIG|perl -pe 's/.*?<(.*?)>/$1 /g')
 if [ -z "$NOTIFY_TO" ]; then
     NOTIFY_TO="release@mozilla.com"
 fi
+NOTIFY_FROM=$(grep "notify_from:" $CONFIG|perl -pe 's/.*?<(.*?)>/$1 /g')
+if [ -z "$NOTIFY_FROM" ]; then
+    NOTIFY_FROM="release@mozilla.com"
+fi
+SUBJECT_TAG="[dev-release-runner]"
+if [ -n "`grep release-automation-notifications@mozilla.com $CONFIG`" ]; then
+    SUBJECT_TAG="[release-runner]"
+fi
 
 
 CURR_DIR=$(cd $(dirname $0); pwd)
@@ -82,7 +90,7 @@ elif [[ $RETVAL != 0 ]]; then
         echo "I'll sleep for $SLEEP_TIME seconds before retry"
         echo
         echo "- release runner"
-    ) | mail -s "[release-runner] failed" $NOTIFY_TO
+    ) | mail -s "${SUBJECT_TAG} failed" -r $NOTIFY_FROM $NOTIFY_TO
 
     sleep $SLEEP_TIME
 fi

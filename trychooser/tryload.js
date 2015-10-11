@@ -15,7 +15,6 @@ function initLoad() {
     "ubuntu64-hw": 0,
     "ubuntu64-vm": 0,
     "mac10.6": 0,
-    "mac10.8": 0,
     "mac10.10": 0,
     "winxp-ix": 0,
     "win7-ix": 0,
@@ -60,6 +59,7 @@ function getTryLoads(callback) {
       totalBuildLoad["linux64-sh-haz"] = totalBuildLoad["linux"];
       totalBuildLoad["linux64-mulet"] = totalBuildLoad["linux"];
       totalBuildLoad["macosx64"] = load_try_build["macosx64"];
+      totalBuildLoad["macosx64-st-an"] = load_try_build["macosx64"];
       totalBuildLoad["win32"] = load_try_build["win64"];
       totalBuildLoad["win64"] = totalBuildLoad["win32"];
       totalBuildLoad["android-api-9"] = totalBuildLoad["linux"];
@@ -78,15 +78,18 @@ function getTryLoads(callback) {
       totalBuildLoad["linux64_graphene"] = totalBuildLoad["linux64"];
       totalBuildLoad["macosx64_graphene"] = totalBuildLoad["macosx64"];
       totalBuildLoad["win64_graphene"] = totalBuildLoad["win64"];
-        
+      totalBuildLoad["linux64_horizon"] = totalBuildLoad["linux64"];
+      totalBuildLoad["macosx64_horizon"] = totalBuildLoad["macosx64"];
+      totalBuildLoad["win64_horizon"] = totalBuildLoad["win64"];
+
       var totalTestLoad = {};
       totalTestLoad["linux"] = load_test["ubuntu32-hw"] + load_test["ubuntu32-vm"];
       totalTestLoad["linux64"] = load_test["ubuntu64-hw"] + load_test["ubuntu64-vm"];
       totalTestLoad["linux64-mulet"] = totalTestLoad["linux64"];
       totalTestLoad["linux64-asan"] = totalTestLoad["linux64"];
       // linux64-st-an: N/A
-      totalTestLoad["macosx64"] = Math.max(load_test["mac10.6"], load_test["mac10.8"],
-                                    load_test["mac10.10"]);
+      totalTestLoad["macosx64"] = Math.max(load_test["mac10.6"], load_test["mac10.10"]);
+      // macosx64-st-an: N/A
       totalTestLoad["macosx64-mulet"] = totalTestLoad["macosx64"];
       totalTestLoad["win32"] = Math.max(load_test["winxp-ix"], load_test["win7-ix"]);
       totalTestLoad["win32-mulet"] = totalTestLoad["win32"];
