@@ -25,7 +25,6 @@ from util.retry import retry
 OK = green('[OK]')
 FAIL = red('[FAIL]')
 SLAVEALLOC = "https://secure.pub.build.mozilla.org/slavealloc/api"
-auth = None
 
 RECONFIG_LOCKFILE = 'reconfig.lock'
 
@@ -292,14 +291,7 @@ def action_update_exception_timestamp(master):
 
 
 def get_ldap_auth():
-    global auth
-    if auth:
-        return auth
-    else:
-        username = raw_input("LDAP username: ")
-        password = getpass("LDAP password: ")
-        auth = (username, password)
-        return auth
+    return ('nthomas@mozilla.com', 'XXXXX')
 
 
 def action_enable_master(master):
