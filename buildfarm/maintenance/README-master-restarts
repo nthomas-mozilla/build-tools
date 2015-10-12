@@ -1,0 +1,25 @@
+Commands to break out the reconfig for speed:
+
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R build -D scl3          -j2 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R build -D aws-us-west-2 -j2 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R build -D aws-us-east-1 -j2 graceful_restart
+
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R try -D scl3          -j1 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R try -D aws-us-west-2 -j1 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -R try -D aws-us-east-1 -j1 graceful_restart
+
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-panda            -j2 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-macosx           -j2 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-windows          -j2 graceful_restart
+
+# talos h/w
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-linux    -D scl3 -j3 graceful_restart
+# aws
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-linux64 -D aws-us-west-2 -j3 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-linux64 -D aws-us-east-1 -j3 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-linux32 -D aws-us-west-2 -j2 graceful_restart
+~/venv/manage-master2/bin/python manage_masters.py -f production-masters.json -M tests1-linux32 -D aws-us-east-1 -j2 graceful_restart
+
+Issues last time this was run:
+* fabric or buildbot-wrangler missed some restarts, and didn't proceed to the next host
+* after many hours running the calls to slavealloc to re-enable weren't working
